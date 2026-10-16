@@ -105,6 +105,7 @@ export function PlaybackSection() {
     settings.controls.showOnPauseAndSkip
   );
   const [autoPlay, setAutoPlay] = useSetting(settings.playback.autoPlayFirst);
+  const [failover, setFailover] = useSetting(settings.playback.failover);
   const [preload, setPreload] = useSetting(settings.playback.preloadVersions);
   const [nextPrompt, setNextPrompt] = useSetting(settings.next.prompt);
   const [nextLead, setNextLead] = useSetting(settings.next.lead);
@@ -171,6 +172,13 @@ export function PlaybackSection() {
         />
         <QuickFiltersRow />
         <BadgesRow />
+        <Switch
+          side="right"
+          label={t`Try the next version if one fails`}
+          help={t`When a version doesn't start, the next one in the list plays instead, from the same point.`}
+          value={failover}
+          onValueChange={setFailover}
+        />
       </SettingsCard>
       <SettingsCard
         name="next-episode"
