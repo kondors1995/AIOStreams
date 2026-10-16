@@ -205,6 +205,9 @@ const DAY_LABEL = perLocale(
       month: 'short',
     })
 );
+const UNTIL = perLocale(
+  (locale) => new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
+);
 
 /** `20 Jan 2008` */
 export function shortDate(iso: string): string {
@@ -256,9 +259,7 @@ export function untilLabel(iso: string): string {
     const units = `${Math.abs(count)} ${unit}${Math.abs(count) === 1 ? '' : 's'}`;
     return count < 0 ? `${units} ago` : `in ${units}`;
   }
-  return new Intl.RelativeTimeFormat(formatLocale(), {
-    numeric: 'auto',
-  }).format(count, unit);
+  return UNTIL().format(count, unit);
 }
 
 export function airedLabel(item: BaseItemDto): string {
