@@ -14,6 +14,7 @@ import {
 import { currentHost } from '../lib/hosts';
 import { drawnRatio } from '../lib/images';
 import { settings, useSetting } from '../lib/settings';
+import { focusVisible } from '../lib/input/focus';
 import { CachedImage } from './cached-image';
 import { Anchor } from './anchor';
 
@@ -427,7 +428,7 @@ export function PosterCard(props: PosterCardProps) {
         onPointerEnter: () => setActive(true),
         onPointerLeave: () => setActive(false),
         onFocus: (e: React.FocusEvent<HTMLAnchorElement>) =>
-          setActive(e.currentTarget.matches(':focus-visible')),
+          setActive(focusVisible(e.currentTarget)),
         onBlur: () => setActive(false),
       })}
     >
