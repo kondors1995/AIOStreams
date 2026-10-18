@@ -921,6 +921,10 @@ msgstr "Code copied"
 msgid "Code or invite link"
 msgstr "Code or invite link"
 
+#: src/components/open-card.tsx
+msgid "Collection"
+msgstr "Collection"
+
 #: src/lib/format.ts
 #: src/pages/discover.tsx
 #: src/pages/item.tsx
@@ -1510,6 +1514,10 @@ msgstr "Enter this code under Quick Connect in an app already signed in, or appr
 #: src/pages/sign-in.tsx
 msgid "Enter your password."
 msgstr "Enter your password."
+
+#: src/components/open-card.tsx
+msgid "Episode"
+msgstr "Episode"
 
 #: src/components/episodes.tsx
 msgid "Episode {number}"
@@ -2262,6 +2270,10 @@ msgstr "Move up"
 msgid "Moves between what's on screen, and to Search and Home. A gamepad's d-pad and left stick move too."
 msgstr "Moves between what's on screen, and to Search and Home. A gamepad's d-pad and left stick move too."
 
+#: src/components/open-card.tsx
+msgid "Movie"
+msgstr "Movie"
+
 #: src/components/kind-tabs.tsx
 #: src/components/random-pick.tsx
 #: src/lib/format.ts
@@ -2704,6 +2716,10 @@ msgstr "Open the app's downloads"
 #: src/lib/input/actions.ts
 msgid "Opens the menu of what is selected, as a right click does."
 msgstr "Opens the menu of what is selected, as a right click does."
+
+#: src/pages/settings/interface.tsx
+msgid "Opens the selected card out, with its details"
+msgstr "Opens the selected card out, with its details"
 
 #: src/pages/settings/playback.tsx
 msgid "Opens versions in {target}, which brings you back here with your place saved."
@@ -3654,6 +3670,10 @@ msgstr "Sends once the party is back"
 #: src/pages/settings/apps.tsx
 msgid "Sends this device's details and the app's recent log to the server, with a code to give whoever looks into it."
 msgstr "Sends this device's details and the app's recent log to the server, with a code to give whoever looks into it."
+
+#: src/components/open-card.tsx
+msgid "Series"
+msgstr "Series"
 
 #: src/pages/settings/subtitles.tsx
 msgid "Serif"

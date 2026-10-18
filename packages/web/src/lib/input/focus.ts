@@ -731,10 +731,13 @@ function shownBox(el: HTMLElement): Element {
  * Scrolls each box holding `el`, innermost first; carousels and boxes marked
  * `data-nav-self-scroll` move themselves. Inside `data-nav-box`es, the
  * outermost comes into view, at the top of a `data-nav-snap` box; inside
- * `data-nav-top`, the page goes to its top.
+ * `data-nav-top`, the page goes to its top; a `data-nav-center` box, as a
+ * row filling a TV's screen, is centred, so its neighbours are out of sight.
  */
 function reveal(el: HTMLElement): void {
   let rect = shownBox(el).getBoundingClientRect();
+  const centred = !!el.closest('[data-nav-center]');
+  const middle = (r: { top: number; bottom: number }) => (r.top + r.bottom) / 2;
   // A dialog or bar stays put as the page behind it scrolls.
   let onBar = false;
   for (let box: HTMLElement | null = el; box; box = box.parentElement) {
@@ -755,15 +758,17 @@ function reveal(el: HTMLElement): void {
     rect = shifted(rect, ...drift(box));
     const dy = !scrollsY
       ? 0
-      : box.hasAttribute('data-nav-snap')
-        ? Math.round(rect.top - view.top - 24)
-        : (toEdge(box, el, rect, view, top) ??
-          shortfall(
-            { start: view.top, end: view.bottom },
-            rect.top,
-            rect.bottom,
-            24
-          ));
+      : centred
+        ? Math.round(middle(rect) - middle(view))
+        : box.hasAttribute('data-nav-snap')
+          ? Math.round(rect.top - view.top - 24)
+          : (toEdge(box, el, rect, view, top) ??
+            shortfall(
+              { start: view.top, end: view.bottom },
+              rect.top,
+              rect.bottom,
+              24
+            ));
     const dx = scrollsX
       ? shortfall(
           { start: view.left, end: view.right },
@@ -786,12 +791,14 @@ function reveal(el: HTMLElement): void {
   const [, drawn] = drift(page);
   const dy = el.closest('[data-nav-top]')
     ? -top
-    : shortfall(
-        { start: 0, end: innerHeight },
-        rect.top + drawn,
-        rect.bottom + drawn,
-        room
-      );
+    : centred
+      ? Math.round(middle(rect) + drawn - innerHeight / 2)
+      : shortfall(
+          { start: 0, end: innerHeight },
+          rect.top + drawn,
+          rect.bottom + drawn,
+          room
+        );
   if (dy) glideTo(page, left, top + dy);
 }
 

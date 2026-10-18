@@ -921,6 +921,10 @@ msgstr ""
 msgid "Code or invite link"
 msgstr ""
 
+#: src/components/open-card.tsx
+msgid "Collection"
+msgstr ""
+
 #: src/lib/format.ts
 #: src/pages/discover.tsx
 #: src/pages/item.tsx
@@ -1509,6 +1513,10 @@ msgstr ""
 
 #: src/pages/sign-in.tsx
 msgid "Enter your password."
+msgstr ""
+
+#: src/components/open-card.tsx
+msgid "Episode"
 msgstr ""
 
 #: src/components/episodes.tsx
@@ -2262,6 +2270,10 @@ msgstr ""
 msgid "Moves between what's on screen, and to Search and Home. A gamepad's d-pad and left stick move too."
 msgstr ""
 
+#: src/components/open-card.tsx
+msgid "Movie"
+msgstr ""
+
 #: src/components/kind-tabs.tsx
 #: src/components/random-pick.tsx
 #: src/lib/format.ts
@@ -2703,6 +2715,10 @@ msgstr ""
 
 #: src/lib/input/actions.ts
 msgid "Opens the menu of what is selected, as a right click does."
+msgstr ""
+
+#: src/pages/settings/interface.tsx
+msgid "Opens the selected card out, with its details"
 msgstr ""
 
 #: src/pages/settings/playback.tsx
@@ -3653,6 +3669,10 @@ msgstr ""
 
 #: src/pages/settings/apps.tsx
 msgid "Sends this device's details and the app's recent log to the server, with a code to give whoever looks into it."
+msgstr ""
+
+#: src/components/open-card.tsx
+msgid "Series"
 msgstr ""
 
 #: src/pages/settings/subtitles.tsx
