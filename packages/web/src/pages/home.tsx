@@ -45,6 +45,7 @@ import { CardPreviewHost } from '../components/card-preview';
 import { MediaRow } from '../components/media-row';
 import { PosterCard, WideCard } from '../components/cards';
 import { ItemMenu } from '../components/item-menu';
+import { OpenCard, OPEN_ROW_ITEM } from '../components/open-card';
 import {
   useStraightPlay,
   useVersionPicker,
@@ -140,7 +141,9 @@ export function HomePage() {
   );
   const canFollow = pointer || !!currentHost().tv;
   const [cardPreviews] = useSetting(settings.interface.cardPreviews);
-  const follow = heroMode !== 'rotate' && canFollow;
+  // Opening the focused card is for a remote; elsewhere it rotates.
+  const open = heroMode === 'open' && !!currentHost().tv;
+  const follow = (heroMode === 'follow' || heroMode === 'corner') && canFollow;
 
   const rows = (
     <>
@@ -176,7 +179,7 @@ export function HomePage() {
         </div>
       ) : (
         onHome.map((view, i) => (
-          <LibraryRow key={view.Id} view={view} first={i === 0} />
+          <LibraryRow key={view.Id} view={view} first={i === 0} open={open} />
         ))
       )}
     </>
@@ -198,20 +201,24 @@ export function HomePage() {
         </div>
       </FollowHero>
     );
+  // Opening cards show their own details, so no hero stands over the rows.
+  const hero = !open;
   return (
     <div className={cn('pb-16', noCatalogs && ['flex flex-col', FILL_WINDOW])}>
-      <Hero items={heroItems} loading={heroLoading} />
+      {hero && <Hero items={heroItems} loading={heroLoading} />}
       <div
         data-ui="home-rows"
         className={cn(
-          heroItems.length || heroLoading
+          hero && (heroItems.length || heroLoading)
             ? 'relative z-[1] space-y-10 px-4 pt-2 lg:ps-0 lg:pe-10'
             : 'relative z-[1] space-y-10 px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] lg:ps-0 lg:pe-10 lg:pt-[calc(2.5rem+env(safe-area-inset-top))]',
-          noCatalogs && 'flex flex-1 flex-col'
+          noCatalogs && 'flex flex-1 flex-col',
+          // A poster's height in the rows whose cards open (open-card.tsx).
+          open && '[--card-h:18rem]'
         )}
       >
         {/* A card rested on grows into a preview, as the hero doesn't follow it. */}
-        {canFollow && cardPreviews ? (
+        {canFollow && cardPreviews && !open ? (
           <CardPreviewHost>{rows}</CardPreviewHost>
         ) : (
           rows
@@ -331,7 +338,16 @@ const ROW_PAGE = 20;
  * scrolls. Its cards wait too when already fetched, as most rows are out of
  * sight: only the first starts drawn, as a page opens at its top.
  */
-function LibraryRow({ view, first }: { view: BaseItemDto; first: boolean }) {
+function LibraryRow({
+  view,
+  first,
+  open,
+}: {
+  view: BaseItemDto;
+  first: boolean;
+  /** Posters open out on focus (the "open" hero mode). */
+  open: boolean;
+}) {
   const { client } = useSession();
   const [ref, near] = useNear<HTMLElement>('400px', first);
   const pages = useItemPages(view.Id!, {
@@ -344,6 +360,7 @@ function LibraryRow({ view, first }: { view: BaseItemDto; first: boolean }) {
   const landscape =
     items.length > 0 &&
     items.filter((i) => cardShape(i) === 'landscape').length > items.length / 2;
+  const opens = open && !landscape;
   const label = libraryLabel(view);
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = pages;
   const more = React.useCallback(() => {
@@ -369,6 +386,8 @@ function LibraryRow({ view, first }: { view: BaseItemDto; first: boolean }) {
         </Anchor>
       }
       shape={landscape ? 'wide' : 'poster'}
+      itemClass={opens ? OPEN_ROW_ITEM : undefined}
+      screen={opens}
       loading={!near || (!pages.data && !pages.isError)}
       waiting={!near}
       loadingMore={isFetchingNextPage}
@@ -377,26 +396,30 @@ function LibraryRow({ view, first }: { view: BaseItemDto; first: boolean }) {
       {near &&
         items.map((item) => (
           <ItemMenu key={item.Id} item={item}>
-            <PosterCard
-              href={href(itemPath(item))}
-              shape={landscape ? 'landscape' : cardShape(item)}
-              image={(width) =>
-                cardImages(
-                  client,
-                  item,
-                  landscape ? 'landscape' : cardShape(item),
-                  { maxWidth: width }
-                )
-              }
-              animated={animatedPosterOf(item)}
-              title={item.Name ?? ''}
-              subtitle={itemSubtitle(item)}
-              itemType={item.Type}
-              watched={item.UserData?.Played}
-              favourite={item.UserData?.IsFavorite}
-              unwatched={item.UserData?.UnplayedItemCount ?? undefined}
-              progress={progressOf(item)}
-            />
+            {opens ? (
+              <OpenCard href={href(itemPath(item))} item={item} />
+            ) : (
+              <PosterCard
+                href={href(itemPath(item))}
+                shape={landscape ? 'landscape' : cardShape(item)}
+                image={(width) =>
+                  cardImages(
+                    client,
+                    item,
+                    landscape ? 'landscape' : cardShape(item),
+                    { maxWidth: width }
+                  )
+                }
+                animated={animatedPosterOf(item)}
+                title={item.Name ?? ''}
+                subtitle={itemSubtitle(item)}
+                itemType={item.Type}
+                watched={item.UserData?.Played}
+                favourite={item.UserData?.IsFavorite}
+                unwatched={item.UserData?.UnplayedItemCount ?? undefined}
+                progress={progressOf(item)}
+              />
+            )}
           </ItemMenu>
         ))}
     </MediaRow>
