@@ -28,6 +28,14 @@ The `.wgt` is unsigned. A Samsung TV only installs a package signed for that TV,
 installs it signs it first (below). With `TIZEN_PROFILE` set to a Tizen Studio security profile,
 the build signs it with that profile instead, through Tizen Studio's `tizen` command.
 
+### Trailers on Samsung TVs
+
+The Tizen package resolves YouTube trailers itself (`web/src/lib/hosts/tizen/youtube.ts`, with the
+desktop and Android apps' clients). AVPlay plays only an HLS playlist's first size, YouTube's
+smallest, so the separate H.264 sizes up to 1080p and the AAC audio go as a DASH manifest in a
+`data:` address, which the page's own video plays through Shaka Player (`web/src/lib/playback/dash.ts`),
+loaded only then.
+
 ## Releases
 
 release-please releases this package on its own (`smart-tv-v*` tags, `chore(smart-tv): release` pull
