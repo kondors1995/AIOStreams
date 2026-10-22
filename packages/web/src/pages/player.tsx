@@ -175,7 +175,8 @@ export function PlayerPage({
       : undefined;
   const fetched = useItem(itemId);
   const item = { ...fetched, data: fetched.data ?? local?.item };
-  const listed = usePlaybackInfo(itemId, { enabled: !local && !sourceId });
+  // The whole list, which a named version's answer doesn't carry, for failover too.
+  const listed = usePlaybackInfo(itemId, { enabled: !local });
   const named = sourceId || playableSources(listed.data)[0]?.Id || undefined;
   const info = usePlaybackInfo(itemId, {
     sourceId: named,
@@ -217,6 +218,7 @@ export function PlayerPage({
     !playing &&
     item.data &&
     source &&
+    (local || !listed.isLoading) &&
     (!youTubeId || youTube.data) &&
     !playback.isLoading &&
     !picks.isLoading
@@ -230,7 +232,7 @@ export function PlayerPage({
       launched: player.kind === 'launched' ? player : undefined,
       local,
       youTube: youTube.data ?? undefined,
-      versions: sources,
+      versions: listed.data ? playableSources(listed.data) : sources,
     });
   }
 
