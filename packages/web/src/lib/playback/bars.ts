@@ -23,27 +23,42 @@ const load = (src: string) =>
     image.src = src;
   });
 
-/** How much of one frame's height each bar takes; null for a frame that can't be read or is all dark. */
+/**
+ * How much of a frame's height each bar takes, from its RGBA pixels at
+ * `width` x `height`: the thinner of the black rows at its top and bottom.
+ * Null for an all-dark frame (a fade, a black frame), which says nothing of bars.
+ */
+export function barsIn(
+  data: ArrayLike<number>,
+  width: number,
+  height: number
+): number | null {
+  const dark = (y: number) => {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      if (Math.max(data[i], data[i + 1], data[i + 2]) > LEVEL) return false;
+    }
+    return true;
+  };
+  let top = 0;
+  while (top < height / 2 && dark(top)) top++;
+  let bottom = 0;
+  while (bottom < height / 2 && dark(height - 1 - bottom)) bottom++;
+  return top < height / 2 ? Math.min(top, bottom) / height : null;
+}
+
+/** One frame's bars; null for a frame that can't be read or is all dark. */
 function barOf(
   context: CanvasRenderingContext2D,
   image: HTMLImageElement
 ): number | null {
   try {
     context.drawImage(image, 0, 0, WIDTH, HEIGHT);
-    const { data } = context.getImageData(0, 0, WIDTH, HEIGHT);
-    const dark = (y: number) => {
-      for (let x = 0; x < WIDTH; x++) {
-        const i = (y * WIDTH + x) * 4;
-        if (Math.max(data[i], data[i + 1], data[i + 2]) > LEVEL) return false;
-      }
-      return true;
-    };
-    let top = 0;
-    while (top < HEIGHT / 2 && dark(top)) top++;
-    let bottom = 0;
-    while (bottom < HEIGHT / 2 && dark(HEIGHT - 1 - bottom)) bottom++;
-    // All dark: a fade or a black frame, which says nothing of bars.
-    return top < HEIGHT / 2 ? Math.min(top, bottom) / HEIGHT : null;
+    return barsIn(
+      context.getImageData(0, 0, WIDTH, HEIGHT).data,
+      WIDTH,
+      HEIGHT
+    );
   } catch {
     return null;
   }

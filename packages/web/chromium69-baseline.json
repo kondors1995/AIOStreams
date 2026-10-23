@@ -1,0 +1,42 @@
+{
+  "missing": {
+    "getAnimations (Chrome 84)": {
+      "components/bar-surface.tsx": 1
+    },
+    "popover / showPopover": {
+      "components/overview.tsx": 3,
+      "components/rating.tsx": 1
+    },
+    "crypto.randomUUID": {
+      "lib/client.ts": 1
+    },
+    ":focus-visible in matches() (throws)": {
+      "lib/input/focus.ts": 1
+    },
+    "requestVideoFrameCallback (Chrome 83)": {
+      "lib/playback/dash.ts": 2
+    },
+    "AbortSignal.timeout / any": {
+      "lib/servers.ts": 1
+    },
+    "checkVisibility": {
+      "lib/use-in-view.ts": 1
+    },
+    "Intl.Locale / DurationFormat": {
+      "pages/calendar.tsx": 1
+    },
+    "dateStyle / timeStyle": {
+      "pages/history.tsx": 2
+    }
+  },
+  "mountReads": {
+    "layout reads in layout effects and ref callbacks": {
+      "components/bar-surface.tsx": 3,
+      "components/layout.tsx": 4,
+      "components/overview.tsx": 2,
+      "components/party/party-sheet.tsx": 3,
+      "components/season-pills.tsx": 2,
+      "components/version-picker.tsx": 1
+    }
+  }
+}

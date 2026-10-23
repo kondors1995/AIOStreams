@@ -9,7 +9,7 @@
     "build": "rsbuild build",
     "build:standalone": "rsbuild build --env-mode standalone",
     "typecheck": "tsc --noEmit",
-    "test": "node --test legacy-css.test.ts",
+    "test": "node --test legacy-css.test.ts bars.test.ts chromium69.test.ts",
     "preview": "rsbuild preview",
     "lint": "eslint src",
     "i18n:extract": "lingui extract --clean && lingui extract-template"
