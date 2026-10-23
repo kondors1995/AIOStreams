@@ -38,16 +38,16 @@ loaded only then.
 
 ## Releases
 
-release-please releases this package on its own (`smart-tv-v*` tags, `chore(smart-tv): release` pull
-requests), and the TV Release workflow attaches `aiostreams-webos-<version>.ipk` and
-`aiostreams-tizen-<version>.wgt` to each release. Like the desktop app, page changes reach the
-changelog through the `chore(smart-tv): update the web app` pull request that moves `web-app.lock`
-forward. The TV Check workflow builds both packages when anything here changes; run it by hand to
-get them as artifacts of the run.
+This fork releases only the Tizen package. The Tizen Release workflow builds it on every push to
+`tizen-5.5` and leaves `aiostreams-tizen-<commit>.wgt` on the run as an artifact. Pushing a `tizen-v*`
+tag also attaches `aiostreams-tizen-<tag without tizen-v>.wgt` to a release of that tag:
 
-Each release also refreshes the rolling `smart-tv` release, which holds the newest packages as
-`aiostreams-webos.ipk` and `aiostreams-tizen.wgt` (its notes come from `feed-release.md`), and the
-`smart-tv-feed` branch, whose one file is the Homebrew Channel repository for the webOS package.
+```sh
+git tag tizen-v0.6.0-1 && git push sov tizen-v0.6.0-1
+```
+
+The package is unsigned (see Tizen below). The webOS package, and the upstream release-please,
+Docker, desktop, Android and docs workflows, are not part of this fork's releases.
 
 ## Install
 
