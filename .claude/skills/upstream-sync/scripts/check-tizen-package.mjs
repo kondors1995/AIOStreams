@@ -3,7 +3,8 @@
 //   1. every JS file parses (a syntax newer than Chromium 69 anywhere in the build fails here, not on the TV);
 //   2. the app starts: no exception or console error, something is drawn (the "Add a server" page, as no server is set);
 //   3. boot.js set the feature classes the CSS fallbacks hang on.
-// Usage: check-tizen-package.mjs [package dir]   Needs ~/tizen-dl/chromium69 (notes/aiostreams-tv.md). Exit 1 on a failure.
+// Usage: check-tizen-package.mjs [package dir]   Needs ~/tizen-dl/chromium69 (notes/aiostreams-tv.md), or CHROMIUM69=<path to
+// its chrome binary>; CI downloads snapshot 576753 (69.0.3497.0). Exit 1 on a failure.
 import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -11,10 +12,9 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 
 const dir = path.resolve(process.argv[2] ?? 'packages/smart-tv/out/tizen');
-const chromePath = path.join(
-  os.homedir(),
-  'tizen-dl/chromium69/chrome-linux/chrome'
-);
+const chromePath =
+  process.env.CHROMIUM69 ??
+  path.join(os.homedir(), 'tizen-dl/chromium69/chrome-linux/chrome');
 if (!fs.existsSync(path.join(dir, 'index.html')))
   throw new Error(`no package in ${dir}: build it first`);
 if (!fs.existsSync(chromePath))
