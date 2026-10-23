@@ -115,7 +115,12 @@ export function GridOpenCard({
     if (ready && cell.current && overlay.current)
       place(cell.current, overlay.current);
   }, [ready]);
-  const onFocus = () => {
+  // Focus moving between the poster and a control in the same cell is no change.
+  const within = (e: React.FocusEvent) =>
+    e.relatedTarget instanceof Node &&
+    !!cell.current?.contains(e.relatedTarget);
+  const onFocus = (e: React.FocusEvent) => {
+    if (within(e)) return;
     stop();
     timers.current = [
       setTimeout(() => setReady(true), READY_MS),
@@ -125,7 +130,8 @@ export function GridOpenCard({
         : []),
     ];
   };
-  const onBlur = () => {
+  const onBlur = (e: React.FocusEvent) => {
+    if (within(e)) return;
     stop();
     shut();
     setReady(false);

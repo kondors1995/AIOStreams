@@ -23,9 +23,9 @@ import {
 import { Artwork, ProgressBar, WatchedMark } from './cards';
 
 /**
- * The home's "opens" hero mode on a TV: a row of posters whose focused one,
- * once focus rests on it, opens out to its landscape picture,  * with its details under it, as tall as the poster. The slide changes shape at
- * once, in CSS on its `data-open`, so the row lays out once; the cards after it
+ * The home's open cards on a TV: a row of posters whose focused one, once
+ * focus rests on it, opens out to its landscape picture, with its details
+ * under it, as tall as the poster. The slide changes shape at once, in CSS on its `data-open`, so the row lays out once; the cards after it
  * are then eased on the compositor from where they were drawn, sliding over to
  * uncover its width.
  */
@@ -307,7 +307,10 @@ export function OpenCard({ href, item }: { href: string; item: BaseItemDto }) {
     const el = slide();
     if (el?.hasAttribute('data-open')) reshape(el, false);
     // Layers kept until the cards have slid back.
-    if (el) setTimeout(() => layered(el, false), OPEN_MS + 50);
+    // Held with the other timers, so focus coming back cancels it: it would
+    // otherwise drop the frame's layer that a trailer's picture needs.
+    if (el)
+      timers.current.push(setTimeout(() => layered(el, false), OPEN_MS + 50));
     setReady(false);
     setTrailer(false);
   };

@@ -88,7 +88,8 @@ export const preloadShaka = () => void import('shaka-player').catch(() => {});
 
 /**
  * Answers Shaka's questions about the TV's panel ourselves: no 4K or 8K, no
- * HDR, as these trailers play at 1080p or less. Its Tizen checks otherwise
+ * HDR, as the trailers playing through here (YouTube's, up to 1080p; titles
+ * play through the TV's own player) need no more. Its Tizen checks otherwise
  * load Samsung's product-info and AV-info plugins, most of a second as a
  * first trailer starts.
  */

@@ -254,7 +254,16 @@ export function whenOnScreen(el: Element, answer: (on: boolean) => void): void {
       const batch = asked;
       asked = [];
       const seen = batch.map(([card]) => onScreen(card));
-      batch.forEach(([, reply], i) => reply(seen[i]));
+      batch.forEach(([, reply], i) => {
+        // One failing reply mustn't leave the rest of the batch unanswered.
+        try {
+          reply(seen[i]);
+        } catch (error) {
+          setTimeout(() => {
+            throw error;
+          });
+        }
+      });
     });
   asked.push([el, answer]);
 }
