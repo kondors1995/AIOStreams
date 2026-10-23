@@ -1,0 +1,56 @@
+name: Tizen Release
+
+# Builds the Tizen package (the app for Samsung TVs from 2020, Tizen 5.5, on) on every push to
+# tizen-5.5 and leaves it on the run as an artifact. Pushing a tizen-v* tag also attaches it to a
+# release of that tag. The package is unsigned: sign it for your TV when installing
+# (packages/smart-tv/README.md).
+on:
+  push:
+    branches: [tizen-5.5]
+    tags: ['tizen-v*']
+  workflow_dispatch:
+
+concurrency:
+  group: tizen-release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  tizen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter "@aiostreams/web..." --filter @aiostreams/smart-tv
+      - run: pnpm -F @aiostreams/web build:standalone
+      - name: Package
+        working-directory: packages/smart-tv
+        run: node scripts/build.mjs tizen
+      - name: Name it after the tag, or the commit
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$REF_TYPE" = tag ]; then name="${REF_NAME#tizen-v}"; else name="${GITHUB_SHA::7}"; fi
+          echo "WGT=aiostreams-tizen-$name.wgt" >>"$GITHUB_ENV"
+          mv packages/smart-tv/out/AIOStreams.wgt "packages/smart-tv/out/aiostreams-tizen-$name.wgt"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.WGT }}
+          path: packages/smart-tv/out/${{ env.WGT }}
+          compression-level: 0
+      - if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 ||
+            gh release create "$TAG" --title "Tizen ${TAG#tizen-v}" --generate-notes
+          gh release upload "$TAG" "packages/smart-tv/out/$WGT" --clobber
