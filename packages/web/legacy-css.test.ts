@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import postcss from 'postcss';
-import { expandIs, legacyCss } from './legacy-css.ts';
+import { expandIs, firstArguments, legacyCss } from './legacy-css.ts';
 
 test('expands :is() into a selector list', () => {
   assert.deepEqual(expandIs('body.app :is(input,textarea)'), [
@@ -84,4 +84,71 @@ test('adds fallbacks without touching the original rules', async () => {
     css,
     /html\.no-focus-visible:not\(\[data-p\]\) \.\\\[html_\\&\\:focus-visible\\\]\\:x:focus\{/
   );
+});
+
+test('writes start/end insets and logical radii as left and right', async () => {
+  const { css } = await postcss([legacyCss()]).process(
+    '.end-2{inset-inline-end:.5rem}.sm\\:start-0{inset-inline-start:0}' +
+      '@media (min-width:640px){.sm\\:start-0{inset-inline-start:0}}' +
+      '.rounded-s{border-start-start-radius:.25rem;border-end-start-radius:.25rem}' +
+      '[data-tv] .tv\\:end-0{inset-inline-end:0!important}',
+    { from: undefined }
+  );
+  assert.match(css, /\.end-2\{inset-inline-end:\.5rem\}/);
+  assert.match(
+    css,
+    /html\.no-logical-props:not\(\[dir=rtl\]\) \.end-2\s*\{\s*right:\s*\.5rem\s*\}/
+  );
+  assert.match(
+    css,
+    /html\.no-logical-props\[dir=rtl\] \.end-2\s*\{\s*left:\s*\.5rem\s*\}/
+  );
+  // Inside its media query, as the rule it follows.
+  assert.match(
+    css,
+    /@media \(min-width:640px\)\{[^]*html\.no-logical-props:not\(\[dir=rtl\]\) \.sm\\:start-0\s*\{\s*left:\s*0/
+  );
+  for (const [side, prop] of [
+    [':not([dir=rtl])', 'border-top-left-radius'],
+    [':not([dir=rtl])', 'border-bottom-left-radius'],
+    ['[dir=rtl]', 'border-top-right-radius'],
+    ['[dir=rtl]', 'border-bottom-right-radius'],
+  ]) {
+    assert.ok(
+      css.includes(`html.no-logical-props${side} .rounded-s{${prop}:.25rem}`),
+      `${side} ${prop}`
+    );
+  }
+  // `[data-tv]` sits on <html>, beside the class.
+  assert.match(
+    css,
+    /\[data-tv\]\.no-logical-props:not\(\[dir=rtl\]\) \.tv\\:end-0\s*\{\s*right:\s*0\s*!important/
+  );
+});
+
+test('falls back to the first size of min() and max()', async () => {
+  assert.equal(firstArguments('max(1rem, env(safe-area-inset-left))'), '1rem');
+  assert.equal(firstArguments('max(env(safe-area-inset-top), .5rem)'), '.5rem');
+  assert.equal(
+    firstArguments('calc(min(14rem, 25vw) * -1)'),
+    'calc(14rem * -1)'
+  );
+  assert.equal(
+    firstArguments('min(32rem, var(--a, calc(1px + 2px)))'),
+    '32rem'
+  );
+  assert.equal(firstArguments('minmax(0, 1fr)'), 'minmax(0, 1fr)');
+  const { css } = await postcss([legacyCss()]).process(
+    '.pe-m{padding-inline-end:max(.75rem,env(safe-area-inset-right))}' +
+      '.tx{--tw-translate-x:min(14rem,25vw)}',
+    { from: undefined }
+  );
+  // Before the original, which a newer engine reads last.
+  assert.match(
+    css,
+    /padding-inline-end:\s*\.75rem;\s*padding-inline-end:\s*max\(/
+  );
+  // A custom property takes the last value, so its stand-in is a rule under a class.
+  assert.match(css, /\.tx\{--tw-translate-x:min\(14rem,25vw\)\}/);
+  assert.match(css, /\.no-min-max \.tx\s*\{\s*--tw-translate-x:\s*14rem/);
 });

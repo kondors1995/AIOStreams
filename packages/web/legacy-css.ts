@@ -4,8 +4,10 @@ import selectorParser from 'postcss-selector-parser';
 /**
  * Keeps the standalone build working on Chromium 69 (2020 Samsung TVs), which
  * drops whole rules over selectors it doesn't know. `:is()` lists are
- * expanded; `:focus-visible`, flex `gap` and `aspect-ratio` get stand-ins that apply under the
- * classes the TV apps' `boot.js` puts on `<html>` when the engine lacks them.
+ * expanded; `:focus-visible`, flex `gap`, `aspect-ratio`, `start-*`/`end-*` and
+ * logical corner radii, and the sizes in `min()`/`max()` get stand-ins that
+ * apply under the classes the TV apps' `boot.js` puts on `<html>` when the
+ * engine lacks them.
  * `:where()` rules are left out: unwrapped, Tailwind's form resets would
  * outrank the utilities.
  */
@@ -31,6 +33,47 @@ export function legacyCss(): Plugin {
         if (/\ddvh\b/.test(decl.value)) {
           decl.cloneBefore({ value: decl.value.replace(/(\d)dvh\b/g, '$1vh') });
         }
+      });
+      // Logical properties with no longhand to fall back on: Lightning CSS
+      // writes them with `:lang()` selectors this engine drops as well.
+      root.walkDecls(LOGICAL_PROP, (decl) => {
+        const rule = decl.parent as Rule;
+        if (rule.type !== 'rule') return;
+        const [ltr, rtl] = LOGICAL[decl.prop];
+        for (const [side, extra] of [
+          [ltr, ':not([dir=rtl])'],
+          [rtl, '[dir=rtl]'],
+        ] as const) {
+          rule
+            .cloneAfter({
+              selectors: rule.selectors.map((s) =>
+                under('no-logical-props', s, extra)
+              ),
+            })
+            .removeAll()
+            .append({
+              prop: side,
+              value: decl.value,
+              important: decl.important,
+            });
+        }
+      });
+      // `min()` and `max()` (Chromium 79) as their first argument, the size a
+      // rule starts from; a custom property takes the last value, so its
+      // stand-in is a rule of its own.
+      root.walkDecls((decl) => {
+        if (!MIN_MAX.test(decl.value)) return;
+        const value = firstArguments(decl.value);
+        const rule = decl.parent as Rule;
+        if (!decl.prop.startsWith('--'))
+          return void decl.cloneBefore({ value });
+        if (rule.type !== 'rule') return;
+        rule
+          .cloneAfter({
+            selectors: rule.selectors.map((s) => under('no-min-max', s)),
+          })
+          .removeAll()
+          .append({ prop: decl.prop, value, important: decl.important });
       });
       root.walkDecls('aspect-ratio', (decl) => {
         const rule = decl.parent as Rule;
@@ -161,15 +204,88 @@ export function legacyCss(): Plugin {
 }
 
 /**
- * `selector` limited to pages whose `<html>` has `className`. A selector that
- * starts on `<html>` itself, as the TV's `[data-tv]` and the dark theme's
- * `.dark` do, takes the class there.
+ * `selector` limited to pages whose `<html>` has `className`, and `extra` on
+ * it, as `[dir=rtl]`. A selector that starts on `<html>` itself, as the TV's
+ * `[data-tv]` and the dark theme's `.dark` do, or on another of these classes,
+ * takes the class there.
  */
-function under(className: string, selector: string): string {
-  const root = /^(html(?![\w-])|\[data-tv\]|\.dark(?![\w-]))/.exec(selector);
-  return root
-    ? `${root[0]}.${className}${selector.slice(root[0].length)}`
+function under(className: string, selector: string, extra = ''): string {
+  const root =
+    /^(html(?![\w-])|\[data-tv\]|\.dark(?![\w-])|\.no-(?:focus-visible|flex-gap|aspect-ratio|logical-props|min-max)(?![\w-]))/.exec(
+      selector
+    );
+  if (root)
+    return `${root[0]}.${className}${extra}${selector.slice(root[0].length)}`;
+  return extra
+    ? `html.${className}${extra} ${selector}`
     : `.${className} ${selector}`;
+}
+
+const LOGICAL_PROP =
+  /^(inset-inline-(start|end)|border-(start|end)-(start|end)-radius)$/;
+
+/** Each logical property as the physical one it is for text running left to right, and right to left. */
+const LOGICAL: Record<string, [string, string]> = {
+  'inset-inline-start': ['left', 'right'],
+  'inset-inline-end': ['right', 'left'],
+  'border-start-start-radius': [
+    'border-top-left-radius',
+    'border-top-right-radius',
+  ],
+  'border-start-end-radius': [
+    'border-top-right-radius',
+    'border-top-left-radius',
+  ],
+  'border-end-start-radius': [
+    'border-bottom-left-radius',
+    'border-bottom-right-radius',
+  ],
+  'border-end-end-radius': [
+    'border-bottom-right-radius',
+    'border-bottom-left-radius',
+  ],
+};
+
+/** `min(`/`max(`, but not `minmax(`. */
+const MIN_MAX = /(?<![\w-])(?:min|max)\(/;
+
+/** `value` split at the commas that aren't inside brackets. */
+function topLevelArguments(value: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < value.length; i++) {
+    if (value[i] === '(') depth++;
+    else if (value[i] === ')') depth--;
+    else if (value[i] === ',' && depth === 0) {
+      parts.push(value.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  parts.push(value.slice(start).trim());
+  return parts;
+}
+
+/**
+ * Each `min()`/`max()` in `value` as its first argument, or the first that
+ * isn't a bare `env()`, which is 0 on a TV: `max(1rem, env(safe-area-inset-left))`
+ * is 1rem there.
+ */
+export function firstArguments(value: string): string {
+  for (let found; (found = MIN_MAX.exec(value));) {
+    const open = found.index + found[0].length;
+    let depth = 1;
+    let end = open;
+    while (depth && end < value.length) {
+      if (value[end] === '(') depth++;
+      else if (value[end] === ')') depth--;
+      end++;
+    }
+    const args = topLevelArguments(value.slice(open, end - 1));
+    const chosen = args.find((a) => !/^env\(/.test(a)) ?? args[0];
+    value = value.slice(0, found.index) + chosen + value.slice(end);
+  }
+  return value;
 }
 
 /** One selector without `:is()`, as the list of selectors it stands for. */
