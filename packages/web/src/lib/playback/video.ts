@@ -211,18 +211,12 @@ export function videoEngine(
           return;
         }
         // A DASH manifest (dash.ts) plays through Shaka, gone with the file.
-        let gone = false;
-        let stop = () => {};
-        void playDash(el, next.url, (error) =>
+        const stop = playDash(el, next.url, (error) =>
           emit({ type: 'failed', error })
-        ).then((teardown) => {
-          if (gone) teardown();
-          else stop = teardown;
-        });
+        );
         const listening = detach;
         detach = () => {
           listening();
-          gone = true;
           stop();
         };
       },
