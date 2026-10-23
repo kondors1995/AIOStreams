@@ -697,6 +697,7 @@ export const settings = {
     mergeNextUp: syncedFlag('mergeNextUp'),
     combineSearch: syncedFlag('combineSearch'),
     openCards: syncedFlag('openCards'),
+    discoverTrailers: syncedFlag('discoverTrailers', true),
     heroMode: syncedChoice<HeroMode>('heroMode', HERO_MODES, 'rotate'),
     episodeLayout: device<EpisodeLayout>(
       'aiostreams-web-interface-episode-layout',

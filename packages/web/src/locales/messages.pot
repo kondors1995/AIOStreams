@@ -3140,6 +3140,10 @@ msgstr ""
 msgid "Plays a little faster or slower to catch up with the party. Off, the video jumps instead."
 msgstr ""
 
+#: src/pages/settings/interface.tsx
+msgid "Plays a trailer in the opened card of Discover's grid. Off, those cards open with their picture and details only; the rows on Home still play theirs."
+msgstr ""
+
 #: src/pages/settings/playback.tsx
 msgid "Plays Dolby Vision where the screen shows it. Turn it off to play the HDR10 picture most of these videos also carry, if Dolby Vision looks dim or flickers. Videos with no HDR10 picture still play in Dolby Vision."
 msgstr ""
@@ -4692,6 +4696,10 @@ msgstr ""
 
 #: src/components/trailers.tsx
 msgid "Trailers"
+msgstr ""
+
+#: src/pages/settings/interface.tsx
+msgid "Trailers on Discover"
 msgstr ""
 
 #: src/pages/settings/subtitles.tsx

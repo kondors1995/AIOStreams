@@ -186,6 +186,9 @@ export function InterfaceSection() {
   const [featured, setFeatured] = useSetting(settings.interface.featured);
   const [heroMode, setHeroMode] = useSetting(settings.interface.heroMode);
   const [openCards, setOpenCards] = useSetting(settings.interface.openCards);
+  const [discoverTrailers, setDiscoverTrailers] = useSetting(
+    settings.interface.discoverTrailers
+  );
   const [mergeNextUp, setMergeNextUp] = useSetting(
     settings.interface.mergeNextUp
   );
@@ -270,13 +273,22 @@ export function InterfaceSection() {
           onValueChange={(value) => setHeroMode(value as HeroMode)}
         />
         {currentHost().tv && (
-          <Switch
-            side="right"
-            label={t`Open cards`}
-            help={t`The poster focus rests on opens out to its landscape picture, with its details under it and its trailer after a moment, in the rows and the grid of Discover.`}
-            value={openCards}
-            onValueChange={setOpenCards}
-          />
+          <>
+            <Switch
+              side="right"
+              label={t`Open cards`}
+              help={t`The poster focus rests on opens out to its landscape picture, with its details under it and its trailer after a moment, in the rows and the grid of Discover.`}
+              value={openCards}
+              onValueChange={setOpenCards}
+            />
+            <Switch
+              side="right"
+              label={t`Trailers on Discover`}
+              help={t`Plays a trailer in the opened card of Discover's grid. Off, those cards open with their picture and details only; the rows on Home still play theirs.`}
+              value={discoverTrailers}
+              onValueChange={setDiscoverTrailers}
+            />
+          </>
         )}
         <Switch
           side="right"

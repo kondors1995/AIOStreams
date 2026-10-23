@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSession } from '../lib/session';
+import { settings, useSetting } from '../lib/settings';
 import { landscapeUrls } from '../lib/images';
 import { itemTitle } from '../lib/format';
 import type { BaseItemDto } from '../lib/types';
@@ -73,6 +74,7 @@ export function GridOpenCard({
   children: React.ReactNode;
 }) {
   const { client } = useSession();
+  const [trailers] = useSetting(settings.interface.discoverTrailers);
   const [ready, setReady] = React.useState(false);
   const [trailer, setTrailer] = React.useState(false);
   const cell = React.useRef<HTMLDivElement>(null);
@@ -118,7 +120,9 @@ export function GridOpenCard({
     timers.current = [
       setTimeout(() => setReady(true), READY_MS),
       setTimeout(open, OPEN_DELAY_MS),
-      setTimeout(() => setTrailer(true), OPEN_DELAY_MS + TRAILER_DELAY_MS),
+      ...(trailers
+        ? [setTimeout(() => setTrailer(true), OPEN_DELAY_MS + TRAILER_DELAY_MS)]
+        : []),
     ];
   };
   const onBlur = () => {
