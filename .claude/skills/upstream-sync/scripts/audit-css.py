@@ -3,7 +3,8 @@
 
 Usage: audit-css.py [css folder, default packages/web/dist-standalone/static/css]
 Counts are what is *present*, not what is broken: the fallbacks sit beside the originals. Compare with BASELINE
-(tizen-5.5 at the first release) to spot something new, then confirm in the probe page.
+(tizen-5.5 at the first release) to spot something new, then confirm in the probe page. Exits 1 when a kind of CSS
+not in BASELINE shows up; growth of a known kind is printed, not failed.
 """
 import glob, re, sys
 
@@ -61,5 +62,10 @@ for name, pattern in CHECKS.items():
     if n or base:
         print(f'{n:6}  {name}{note}')
 new = [k for k, p in CHECKS.items() if k not in BASELINE and re.search(p, css)]
+grown = [k for k, b in BASELINE.items() if len(re.findall(CHECKS[k], css)) > b]
+if grown:
+    print('\nMore than the baseline (look at what upstream added; the fallbacks cover gap, aspect-ratio, dvh, min/max and logical properties):', ', '.join(grown))
 if new:
     print('\nNOT in the baseline, now present:', ', '.join(new))
+    print('A kind of CSS Chromium 69 cannot parse is new: check it in the probe page, add a fallback in legacy-css.ts or accept it, then add it to BASELINE.')
+    sys.exit(1)
