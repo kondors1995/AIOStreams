@@ -51,6 +51,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          gh release view "$TAG" >/dev/null 2>&1 ||
-            gh release create "$TAG" --title "Tizen ${TAG#tizen-v}" --generate-notes
+          # The release's text is packages/smart-tv/release-notes/<tag>.md, else generated.
+          notes="packages/smart-tv/release-notes/$TAG.md"
+          if [ -f "$notes" ]; then text=(--notes-file "$notes"); else text=(--generate-notes); fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            if [ -f "$notes" ]; then gh release edit "$TAG" "${text[@]}"; fi
+          else
+            gh release create "$TAG" --title "Tizen ${TAG#tizen-v}" "${text[@]}"
+          fi
           gh release upload "$TAG" "packages/smart-tv/out/$WGT" --clobber
