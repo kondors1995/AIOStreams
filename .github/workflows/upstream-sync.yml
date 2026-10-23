@@ -1,9 +1,13 @@
 name: Upstream Sync
 
-# Merges an upstream smart-tv release (a tag in Viren070/AIOStreams) into tizen-5.5 on a branch sync/<tag>, runs the
-# pre-TV checks (.claude/skills/upstream-sync/scripts/verify-before-tv.sh), and opens a pull request carrying the
-# unsigned .wgt to try on the TV. It never touches tizen-5.5 itself and never makes a release: merging the PR and
-# tagging are done by hand after the TV test and profile (notes/profiling.md).
+# Merges an upstream smart-tv release (a tag in Viren070/AIOStreams) into the branch aio-upstream, runs the pre-TV
+# checks (.claude/skills/upstream-sync/scripts/verify-before-tv.sh), and keeps one pull request open from aio-upstream
+# to tizen-5.5, carrying the unsigned .wgt to try on the TV. It never touches tizen-5.5 and never makes a release:
+# merging the PR and tagging are done by hand after the TV test and profile (notes/profiling.md).
+#
+# aio-upstream is made from tizen-5.5 the first time. Each run then brings tizen-5.5 into it (so the PR stays
+# mergeable) and merges the new tag on top, so a second upstream release before the first is merged lands on the same
+# PR. To start over, close the PR and delete the branch: git push sov --delete aio-upstream.
 #
 # Started by upstream-watch.yml, or by hand:  gh workflow run upstream-sync.yml -f tag=smart-tv-v0.8.0
 #
@@ -25,8 +29,12 @@ on:
         default: Viren070/AIOStreams
         type: string
       base:
-        description: 'Branch to merge into'
+        description: 'Branch the pull request targets'
         default: tizen-5.5
+        type: string
+      branch:
+        description: 'Branch the merges are made on'
+        default: aio-upstream
         type: string
   workflow_call:
     inputs:
@@ -39,13 +47,16 @@ on:
       base:
         default: tizen-5.5
         type: string
+      branch:
+        default: aio-upstream
+        type: string
 
 permissions:
   contents: write
   pull-requests: write
 
 concurrency:
-  group: upstream-sync-${{ inputs.tag }}
+  group: upstream-sync
   cancel-in-progress: false
 
 env:
@@ -54,12 +65,14 @@ env:
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
+    # Pinned: the Chromium libraries below are Ubuntu 24.04's (t64) package names.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       TAG: ${{ inputs.tag }}
       UPSTREAM: ${{ inputs.upstream }}
       BASE: ${{ inputs.base }}
+      BRANCH: ${{ inputs.branch }}
       GH_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
     steps:
       - uses: actions/checkout@v7
@@ -68,30 +81,14 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.SYNC_TOKEN || github.token }}
 
-      - name: Skip a tag that already has a sync branch or pull request
-        id: guard
-        run: |
-          branch="sync/$TAG"
-          echo "branch=$branch" >>"$GITHUB_OUTPUT"
-          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1 \
-             || [ -n "$(gh pr list --head "$branch" --state all --json number --jq '.[].number')" ]; then
-            echo "skip=true" >>"$GITHUB_OUTPUT"
-            echo "### $TAG already has a sync branch or pull request: nothing to do" >>"$GITHUB_STEP_SUMMARY"
-          fi
-
       - uses: pnpm/action-setup@v6
-        if: steps.guard.outputs.skip != 'true'
       - uses: actions/setup-node@v7
-        if: steps.guard.outputs.skip != 'true'
         with:
           node-version: 24
           cache: pnpm
 
-      - name: Merge the upstream release
+      - name: Merge the upstream release onto the branch
         id: merge
-        if: steps.guard.outputs.skip != 'true'
-        env:
-          BRANCH: ${{ steps.guard.outputs.branch }}
         run: |
           set -uo pipefail
           git config user.name "github-actions[bot]"
@@ -100,18 +97,27 @@ jobs:
             || { echo "::error title=No such tag::$TAG is not a tag of $UPSTREAM"; exit 1; }
           target=$(git rev-parse "refs/tags/upstream/$TAG^{commit}")
           echo "target=$target" >>"$GITHUB_OUTPUT"
+
+          # The branch: the existing one with the base brought in, else a new one from the base.
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$BRANCH"
+            git switch -c "$BRANCH" "origin/$BRANCH"
+            git merge --no-edit "origin/$BASE" \
+              || { echo "### Could not bring $BASE into $BRANCH" >>"$GITHUB_STEP_SUMMARY"; git diff --name-only --diff-filter=U | sed 's/^/- /' >>"$GITHUB_STEP_SUMMARY"; git merge --abort; exit 1; }
+          else
+            git switch -c "$BRANCH"
+          fi
+
           if git merge-base --is-ancestor "$target" HEAD; then
             echo "uptodate=true" >>"$GITHUB_OUTPUT"
-            echo "### $TAG (${target::8}) is already in $BASE: nothing to merge" >>"$GITHUB_STEP_SUMMARY"
+            echo "### $TAG (${target::8}) is already in $BRANCH or $BASE: nothing to merge" >>"$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          git switch -c "$BRANCH"
           echo "count=$(git rev-list --count HEAD.."$target")" >>"$GITHUB_OUTPUT"
           git merge --no-ff --no-commit "$target"
 
           # Upstream's workflows are not this fork's: drop them, whatever the merge did with them.
-          git ls-files .github/workflows \
-            | grep -vE '/(tizen-release|upstream-sync|upstream-watch)\.yml$' \
+          { git ls-files .github/workflows | grep -vE '/(tizen-release|upstream-sync|upstream-watch)\.yml$' || true; } \
             | xargs -r git rm -qf
 
           # Conflicts with a known resolution: the lockfile is regenerated below, the catalogs by the checks.
@@ -139,19 +145,18 @@ jobs:
 
           pnpm install --lockfile-only --ignore-scripts
           git add -A
-          git commit -q -m "Merge upstream $TAG (${target::8}) into $BASE" \
+          git commit -q -m "Merge upstream $TAG (${target::8}) into $BRANCH" \
             -m "Settled by the sync workflow: upstream's own workflows dropped, pnpm-lock.yaml regenerated, translation catalogs left for the checks."
 
       - name: Chromium 69 (cached)
-        if: steps.guard.outputs.skip != 'true' && steps.merge.outputs.uptodate != 'true'
-        id: chromium
+        if: steps.merge.outputs.uptodate != 'true'
         uses: actions/cache@v4
         with:
           path: ~/chromium69
           key: chromium69-${{ env.CHROMIUM_REVISION }}
 
       - name: Chromium 69 (download) and the libraries it loads
-        if: steps.guard.outputs.skip != 'true' && steps.merge.outputs.uptodate != 'true'
+        if: steps.merge.outputs.uptodate != 'true'
         run: |
           set -eu
           if [ ! -x "$HOME/chromium69/chrome-linux/chrome" ]; then
@@ -168,7 +173,7 @@ jobs:
 
       - name: Pre-TV checks
         id: verify
-        if: steps.guard.outputs.skip != 'true' && steps.merge.outputs.uptodate != 'true'
+        if: steps.merge.outputs.uptodate != 'true'
         run: |
           set +e
           # Unsigned (TIZEN_PROFILE empty): signing needs a Samsung certificate that lists the TV.
@@ -179,7 +184,7 @@ jobs:
           exit 0
 
       - name: Commit regenerated translation catalogs
-        if: steps.guard.outputs.skip != 'true' && steps.merge.outputs.uptodate != 'true'
+        if: steps.merge.outputs.uptodate != 'true'
         run: |
           git add -A packages/web/src/locales
           if ! git diff --cached --quiet; then
@@ -188,14 +193,14 @@ jobs:
 
       - name: The package, named for the sync
         id: package
-        if: steps.guard.outputs.skip != 'true' && steps.merge.outputs.uptodate != 'true' && steps.verify.outputs.status == '0'
+        if: steps.merge.outputs.uptodate != 'true' && steps.verify.outputs.status == '0'
         run: |
           version="${TAG##*-v}"
           mv packages/smart-tv/out/AIOStreams.wgt "packages/smart-tv/out/aiostreams-tizen-sync-$version.wgt"
           echo "wgt=aiostreams-tizen-sync-$version.wgt" >>"$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v7
-        if: steps.guard.outputs.skip != 'true' && steps.merge.outputs.uptodate != 'true' && steps.package.outcome == 'success'
+        if: steps.merge.outputs.uptodate != 'true' && steps.package.outcome == 'success'
         id: artifact
         with:
           name: ${{ steps.package.outputs.wgt }}
@@ -203,16 +208,15 @@ jobs:
           compression-level: 0
 
       - uses: actions/upload-artifact@v7
-        if: always() && steps.guard.outputs.skip != 'true' && steps.merge.outputs.uptodate != 'true'
+        if: always() && steps.merge.outputs.uptodate != 'true'
         with:
           name: verify-log
           path: verify.log
           if-no-files-found: ignore
 
-      - name: Push the branch and open the pull request
-        if: steps.guard.outputs.skip != 'true' && steps.merge.outputs.uptodate != 'true'
+      - name: Push the branch and open or update the pull request
+        if: steps.merge.outputs.uptodate != 'true'
         env:
-          BRANCH: ${{ steps.guard.outputs.branch }}
           TARGET: ${{ steps.merge.outputs.target }}
           COUNT: ${{ steps.merge.outputs.count }}
           STATUS: ${{ steps.verify.outputs.status }}
@@ -223,12 +227,12 @@ jobs:
           version="${TAG##*-v}"
           git push origin "$BRANCH"
           {
-            echo "Merges upstream \`$TAG\` ([\`${TARGET::8}\`](https://github.com/$UPSTREAM/commit/$TARGET), $COUNT commits) into \`$BASE\`."
+            echo "Merges upstream \`$TAG\` ([\`${TARGET::8}\`](https://github.com/$UPSTREAM/commit/$TARGET), $COUNT commits) into \`$BASE\`, on \`$BRANCH\`."
             echo
             if [ "$STATUS" = 0 ]; then
               echo "**Pre-TV checks: passed** (typecheck, lint, tests, the Tizen package build, a boot in Chromium 69, the CSS audit)."
             else
-              echo "**Pre-TV checks: FAILED** (opened as a draft). The log is the \`verify-log\` artifact of [the run]($RUN_URL); the end of it:"
+              echo "**Pre-TV checks: FAILED** (the PR is a draft). The log is the \`verify-log\` artifact of [the run]($RUN_URL); the end of it:"
               echo
               echo '```'
               tail -n 30 verify.log
@@ -246,17 +250,25 @@ jobs:
             echo "- [ ] Smoke-test: Play, Trailers, Skip, Settings > Interface."
             echo "- [ ] Merge, then tag: \`git tag -a tizen-v$version-1 -m \"...\" && git push sov tizen-v$version-1\` (write \`packages/smart-tv/release-notes/tizen-v$version-1.md\` first)."
             echo
-            echo "## What came in"
+            echo "## What came in with $TAG"
             echo
             echo '```'
-            git diff --stat "$BASE..$BRANCH" -- packages/web packages/ui packages/smart-tv packages/core/src/jellyfin | tail -25
+            git diff --stat "HEAD~1" HEAD -- packages/web packages/ui packages/smart-tv packages/core/src/jellyfin | tail -25
             echo '```'
           } >pr.md
-          flags=()
-          [ "$STATUS" = 0 ] || flags+=(--draft)
-          gh pr create --base "$BASE" --head "$BRANCH" --title "Sync upstream smart-tv $version" --body-file pr.md "${flags[@]}"
+          title="Sync upstream smart-tv $version"
+          number=$(gh pr list --head "$BRANCH" --base "$BASE" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --title "$title" --body-file pr.md
+            gh pr comment "$number" --body "Updated for \`$TAG\`: pre-TV checks $([ "$STATUS" = 0 ] && echo passed || echo FAILED). [Run]($RUN_URL)."
+            if [ "$STATUS" = 0 ]; then gh pr ready "$number" || true; else gh pr ready "$number" --undo || true; fi
+          else
+            flags=()
+            [ "$STATUS" = 0 ] || flags+=(--draft)
+            gh pr create --base "$BASE" --head "$BRANCH" --title "$title" --body-file pr.md "${flags[@]}"
+          fi
           {
-            echo "### Sync $TAG: pull request opened"
+            echo "### Sync $TAG: pull request $([ -n "$number" ] && echo "#$number updated" || echo opened)"
             echo "Pre-TV checks: $([ "$STATUS" = 0 ] && echo passed || echo FAILED, draft)"
           } >>"$GITHUB_STEP_SUMMARY"
           [ "$STATUS" = 0 ] || exit 1

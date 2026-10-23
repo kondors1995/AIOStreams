@@ -1,9 +1,9 @@
 name: Upstream Watch
 
 # Every day at midnight UTC, looks at Viren070/AIOStreams for a smart-tv release newer than the one tizen-5.5 carries
-# (packages/smart-tv/package.json, which an upstream merge brings along). If there is one, and it has no sync branch or
-# pull request yet, it starts upstream-sync.yml for it: merge, pre-TV checks, and a pull request to try on the TV
-# before any release of ours.
+# (packages/smart-tv/package.json, which an upstream merge brings along). If there is one it starts upstream-sync.yml
+# for it: merge onto the branch aio-upstream (which does nothing when the branch or tizen-5.5 already holds that
+# release), pre-TV checks, and one rolling pull request to tizen-5.5 to try on the TV before any release of ours.
 #
 # Scheduled workflows run from the default branch (tizen-5.5) and GitHub switches them off after 60 days without
 # repository activity.
