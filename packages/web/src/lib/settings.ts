@@ -714,6 +714,7 @@ export const settings = {
     mergeNextUp: syncedFlag('mergeNextUp'),
     combineSearch: syncedFlag('combineSearch'),
     openCards: syncedFlag('openCards'),
+    discoverTrailers: syncedFlag('discoverTrailers', true),
     heroMode: syncedChoice<HeroMode>('heroMode', HERO_MODES, 'rotate'),
     heroSeconds: syncedChoice<number>('heroSeconds', HERO_SECONDS, 9),
     episodeLayout: device<EpisodeLayout>(
