@@ -41,7 +41,7 @@ async function playbackOf(url: string): Promise<TrailerPlayback> {
   if (!id) return { kind: 'video', url };
   const { resolveYouTube } = currentHost();
   if (resolveYouTube) {
-    const stream = await resolveYouTube(id);
+    const stream = await resolveYouTube(id, { dash: true });
     return stream ? { kind: 'video', url: stream } : { kind: 'external', url };
   }
   // YouTube's embed refuses a page without a web address.

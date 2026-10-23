@@ -95,7 +95,8 @@ function tell(text: string): void {
  * start on its largest size, which Tizen 6's AVPlay doesn't heed.
  */
 export function adaptiveInfo(url: string): string | null {
-  return /^https?:/i.test(url) && /\.m3u8|\/manifest\//i.test(url)
+  return /^https?:\/\/[^/]*(?:googlevideo|youtube)\.com\//i.test(url) &&
+    /\.m3u8|\/manifest\//i.test(url)
     ? 'STARTBITRATE=HIGHEST|SKIPBITRATE=LOWEST'
     : null;
 }
@@ -172,6 +173,13 @@ function stream(format: Format): DashStream | null {
   const [, mime, codecs] =
     /^([^;]+);\s*codecs="([^"]+)"/.exec(mimeType ?? '') ?? [];
   if (!url || !mime || !codecs || !initRange || !indexRange) return null;
+  const ranges = [
+    initRange.start,
+    initRange.end,
+    indexRange.start,
+    indexRange.end,
+  ].map(Number);
+  if (!ranges.every(Number.isFinite)) return null;
   return {
     id: String(format.itag ?? codecs),
     url,
@@ -215,13 +223,16 @@ function dashOf(formats: Format[]): string | null {
   return dashAddress(dashManifest(durationMs, video, [audio]));
 }
 
-export async function resolveYouTube(videoId: string): Promise<string | null> {
+export async function resolveYouTube(
+  videoId: string,
+  { dash: allowDash = false }: { dash?: boolean } = {}
+): Promise<string | null> {
   if (!/^[\w-]{11}$/.test(videoId)) return null;
   for (const client of CLIENTS) {
     try {
       const streaming = await ask(client, videoId);
       if (!streaming) continue;
-      const dash = dashOf(streaming.adaptiveFormats ?? []);
+      const dash = allowDash ? dashOf(streaming.adaptiveFormats ?? []) : null;
       if (dash) return dash;
       const fallback =
         streaming.hlsManifestUrl ?? streaming.formats?.find((f) => f.url)?.url;
