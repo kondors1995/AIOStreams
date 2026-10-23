@@ -86,3 +86,5 @@ that lists that TV's device ID (DUID), so releases ship it unsigned.
 sdb connect <tv-ip>
 tizen install -n out/AIOStreams.wgt -t <device-name>   # name from `sdb devices`
 ```
+
+<!-- simulated upstream release, for testing the sync workflow -->
