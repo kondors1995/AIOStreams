@@ -13,23 +13,6 @@ export const isDash = (url: string) => url.startsWith(PREFIX);
 
 export const dashAddress = (manifest: string) => PREFIX + btoa(manifest);
 
-/**
- * The manifest at `url` without its sizes taller than `max`, as for a card
- * that draws a trailer small; as it was where none would be left.
- */
-export function capHeight(url: string, max: number): string {
-  if (!isDash(url)) return url;
-  const manifest = atob(url.slice(PREFIX.length));
-  const capped = manifest.replace(
-    /<Representation\b[^>]*\bheight="(\d+)"[^>]*>[\s\S]*?<\/Representation>/g,
-    (representation, height: string) =>
-      Number(height) > max ? '' : representation
-  );
-  return /contentType="video"[^>]*><Representation/.test(capped)
-    ? dashAddress(capped)
-    : url;
-}
-
 /** One stream of a manifest: a whole file, indexed by its own `sidx`. */
 export interface DashStream {
   id: string;

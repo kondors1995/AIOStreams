@@ -94,8 +94,14 @@ export interface Host {
   signedIn?(client: JellyfinClient): void;
   /** Saves what the page asks for to the device. */
   downloads?: DownloadsHost;
-  /** A YouTube video's stream, which only plays from the address that asked. */
-  resolveYouTube?(id: string): Promise<string | null>;
+  /**
+   * A YouTube video's stream, which only plays from the address that asked.
+   * `dash` allows a DASH manifest, which only the trailer page plays.
+   */
+  resolveYouTube?(
+    id: string,
+    options?: { dash?: boolean }
+  ): Promise<string | null>;
   /** Shows these above the on-screen keyboard's keys, for the field it types into. */
   keyboardCompletions?(names: string[]): void;
   /** What the device's speech recogniser heard, or null for nothing. */
