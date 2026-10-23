@@ -390,7 +390,6 @@ export function MediaRow({
   startIndex,
   action,
   rowRef,
-  screen,
   children,
 }: {
   id?: string;
@@ -409,12 +408,6 @@ export function MediaRow({
   startIndex?: number;
   action?: React.ReactNode;
   rowRef?: React.Ref<HTMLElement>;
-  /**
-   * Fills the screen's height, its cards in the middle, and is centred as
-   * focus comes in, so the rows beside it are out of sight (a TV's opening
-   * cards).
-   */
-  screen?: boolean;
   children?: React.ReactNode;
 }) {
   const restoreKey = useEntryKey(id);
@@ -486,8 +479,6 @@ export function MediaRow({
       data-nav-group
       data-nav-box
       data-nav-resume
-      data-nav-center={screen || undefined}
-      className={cn(screen && 'flex min-h-screen flex-col justify-center')}
       style={{ '--poster-text': posterText(lines) } as React.CSSProperties}
     >
       {native ? (

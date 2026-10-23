@@ -21,7 +21,7 @@ export type PosterLine = 'title' | 'year';
 export const EPISODE_LAYOUTS = ['auto', 'row', 'list'] as const;
 export type EpisodeLayout = (typeof EPISODE_LAYOUTS)[number];
 
-export const HERO_MODES = ['rotate', 'follow', 'corner', 'open'] as const;
+export const HERO_MODES = ['rotate', 'follow', 'corner'] as const;
 export type HeroMode = (typeof HERO_MODES)[number];
 export const HERO_SECONDS = [5, 7, 9, 12, 15, 20, 30] as const;
 
@@ -713,6 +713,7 @@ export const settings = {
     ),
     mergeNextUp: syncedFlag('mergeNextUp'),
     combineSearch: syncedFlag('combineSearch'),
+    openCards: syncedFlag('openCards'),
     heroMode: syncedChoice<HeroMode>('heroMode', HERO_MODES, 'rotate'),
     heroSeconds: syncedChoice<number>('heroSeconds', HERO_SECONDS, 9),
     episodeLayout: device<EpisodeLayout>(
