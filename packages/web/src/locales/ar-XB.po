@@ -27,6 +27,18 @@ msgstr ""
 msgid "{count, plural, one {# badge} other {# badges}}"
 msgstr ""
 
+#: src/lib/format.ts
+msgid "{count, plural, one {# day ago} other {# days ago}}"
+msgstr ""
+
+#: src/lib/format.ts
+msgid "{count, plural, one {# hour ago} other {# hours ago}}"
+msgstr ""
+
+#: src/lib/format.ts
+msgid "{count, plural, one {# minute ago} other {# minutes ago}}"
+msgstr ""
+
 #: src/pages/settings/playback.tsx
 msgid "{count, plural, one {# minute} other {# minutes}}"
 msgstr ""
