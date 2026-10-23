@@ -1,6 +1,6 @@
 ---
 name: upstream-sync
-description: Bring Viren070/AIOStreams upstream main into this fork's tizen-5.5 branch (kondors1995/AIOStreams) and keep the Samsung 2020 TV (Tizen 5.5, Chromium 69) build working. Merges, resolves the known conflicts, scans the new upstream code for what Chromium 69 lacks, reruns the checks, always profiles on the TV against the baseline in notes/profiling.md, tests on the TV, pushes and optionally releases. Use when asked to sync, merge, rebase or update from upstream, take in upstream changes, or update the fork.
+description: Bring Viren070/AIOStreams upstream main into this fork's tizen-5.5 branch (kondors1995/AIOStreams) and keep the Samsung 2020 TV (Tizen 5.5, Chromium 69) build working. Merges, resolves the known conflicts, scans the new upstream code for what Chromium 69 lacks, reruns the checks (verify-before-tv.sh: tests, a Chromium 69 boot of the Tizen package, CSS audit; only the Tizen package is built), always profiles on the TV against the baseline in notes/profiling.md, tests on the TV, pushes and optionally releases. Use when asked to sync, merge, rebase or update from upstream, take in upstream changes, or update the fork.
 ---
 
 # Sync the fork with upstream
@@ -17,6 +17,10 @@ Background, commands and scripts for the TV are in `notes/` (a separate git repo
 - Push `tizen-5.5` and tag a release only when the user asked, or after saying what you are about to push.
 - Don't drive the TV (install, debug launch, key presses) while the user may be watching: say so and ask. Do ask: step 5
   (profiling) is not optional, so a sync is not finished until the user has let it run.
+- **Build only the Tizen package**: `pnpm -F @aiostreams/web build:standalone`, then `packages/smart-tv/scripts/build.mjs tizen`
+  (plus core's build, which web's types need). Never `pnpm build`: the desktop, Android, docs, Seanime and other
+  packages are not this fork's business, and upstream's changes to them are not checked here.
+- **Nothing goes to the TV before `verify-before-tv.sh` passes** (step 3).
 - **Always profile after a sync** (step 5), however small the merge: upstream's changes have cost this app seconds of
   main-thread time before without any test failing (forced layouts in Discover, a polyfill polling every frame).
 - Commit trailer: the one the session's attribution reminder gives.
@@ -62,27 +66,46 @@ Resolve each conflict by keeping upstream's change and our TV addition. Known on
 Anything else: keep both intents and say so in the merge commit. When upstream moves a file we changed, look for its
 new home with `git log --follow` rather than dropping our change.
 
-## 3. Checks (all must pass)
+## 3. Checks before the TV (all must pass)
 
 ```sh
-export PATH="$HOME/.local/share/fnm/aliases/default/bin:$HOME/tizen-studio/tools/ide/bin:$HOME/tizen-studio/tools:$PATH"
-pnpm install --frozen-lockfile
-pnpm -F @aiostreams/core build
-pnpm -F @aiostreams/web typecheck && pnpm -F @aiostreams/web lint && pnpm -F @aiostreams/web test
-pnpm -F @aiostreams/web i18n:extract && git checkout main -- packages/web/src/locales/de.po packages/web/src/locales/pl.po
+.claude/skills/upstream-sync/scripts/verify-before-tv.sh        # stops at the first failure, names the step
 ```
 
+It runs, in order: frozen install, core build, web typecheck, web lint, **web tests**, translation catalogs, the Tizen
+package build (and nothing else), a **boot of that package in the local Chromium 69**, and the CSS audit. The tests and
+checks that came out of the 2026-10-24 profiling:
+
+| Check | Catches | When it fails |
+| --- | --- | --- |
+| `chromium69.test.ts` "no new use of an API Chromium 69 lacks" | `Intl.Locale`, `randomUUID`, `getAnimations`, `:has()` in a selector string, `requestVideoFrameCallback`, … in `packages/web/src` | guard it, stand it in (`boot.js`), or avoid it; then `UPDATE_BASELINE=1 node --test chromium69.test.ts` in `packages/web` |
+| `chromium69.test.ts` "no new layout reads while React mounts" | `getBoundingClientRect`/`onScreen()`/`offsetWidth`… inside a layout effect or ref callback: a forced layout per card (Discover cost 1.1 s) | batch with `whenOnScreen()` (`lib/use-in-view.ts`) or read once outside the mount path; then record |
+| `chromium69.test.ts` "every `Intl.RelativeTimeFormat` use is behind its fallback" | the Activity page crash on the TV | add the `!Intl.RelativeTimeFormat` fallback above the use |
+| `bars.test.ts` | the trailer black-bar detection (`barsIn`) | fix `lib/playback/bars.ts` |
+| `legacy-css.test.ts` | the CSS fallbacks (`legacy-css.ts`) | fix the fallback |
+| `check-tizen-package.mjs` | any script in the package that Chromium 69 can't parse; the app not starting (exception, console error, nothing drawn); `boot.js` not setting its classes | the message names the file or error |
+| `audit-css.py` | a kind of CSS Chromium 69 can't parse that is new (exit 1); growth of a known kind is printed | probe it, add a fallback, or accept and add to `BASELINE` |
+
+A baseline update is a decision, not a chore: say in the commit what was reviewed and why it is fine.
+
+The same pieces by hand: `pnpm install --frozen-lockfile`, `pnpm -F @aiostreams/core build`,
+`pnpm -F @aiostreams/web typecheck && pnpm -F @aiostreams/web lint && pnpm -F @aiostreams/web test`,
+`pnpm -F @aiostreams/web i18n:extract && git checkout main -- packages/web/src/locales/de.po packages/web/src/locales/pl.po`.
 The lint rule `lingui/no-unlocalized-strings` fails on any user-visible string not in `t\`\``/`<Trans>`; codec names in
 `lib/playback/support.ts` are exempt by a file-level disable. Core's `toWireMediaInfo > maps audio and subtitle
 tracks` test fails on upstream too.
 
+What these cannot do: they run at PC speed with no server, so no timing (that is the TV profile, step 5), and they
+render only the "Add a server" page, so a crash on a page that needs data (the Activity page was one) is caught by the
+static ratchets and by the TV sweep, not by the boot check.
+
 ## 4. What upstream added that Chromium 69 can't run
 
 ```sh
-.claude/skills/upstream-sync/scripts/scan-upstream.sh $OLD origin/main   # JS and CSS added lines using unsupported things
-pnpm -F @aiostreams/web build:standalone
-.claude/skills/upstream-sync/scripts/audit-css.py                        # CSS features still in the build, vs the baseline in the script
+.claude/skills/upstream-sync/scripts/scan-upstream.sh $OLD origin/main   # the lines upstream added that use unsupported things (the tests above ratchet the whole tree; this shows the new lines)
 ```
+
+(`audit-css.py` already ran in step 3.)
 
 Also look for new code that reads layout (`getBoundingClientRect`, `offsetWidth`, `scrollTop`, `getComputedStyle`) from a ref
 callback, a layout effect, or per item in a list: on this TV each read after a DOM write is a full layout (Discover's
@@ -101,7 +124,7 @@ CSS feature → a fallback in `packages/web/legacy-css.ts` with a case in `legac
 
 ## 5. Profile on the TV (always)
 
-After the merge commit builds, install it and run the profile in `notes/profiling.md` (read it: the scripts, the
+Install the `.wgt` that step 3 built (`packages/smart-tv/out/AIOStreams.wgt`, steps in `notes/aiostreams-tv.md`) and run the profile in `notes/profiling.md` (read it: the scripts, the
 baseline table, the rules, and what counts as a regression):
 
 1. `ui-sweep.mjs` with open cards and Discover trailers ON (leave them ON afterwards), against the baseline table.
