@@ -93,10 +93,20 @@ export async function playDash(
   url: string,
   onError: (message: string) => void
 ): Promise<() => void> {
-  const { default: shaka } = await import('shaka-player');
-  shaka.polyfill.installAll();
-  const player = new shaka.Player();
-  await player.attach(video);
+  let shaka: (typeof import('shaka-player'))['default'];
+  let player: InstanceType<(typeof shaka)['Player']> | undefined;
+  try {
+    shaka = (await import('shaka-player')).default;
+    shaka.polyfill.installAll();
+    player = new shaka.Player();
+    await player.attach(video);
+  } catch (error) {
+    // Made but not attached, it still holds what its constructor set up.
+    void player?.destroy();
+    const code = (error as { code?: number }).code ?? String(error);
+    onError(t`The trailer didn't load (error ${code})`);
+    return () => {};
+  }
   player.configure({
     abr: { defaultBandwidthEstimate: 20_000_000 },
     streaming: { bufferingGoal: 30, rebufferingGoal: 2 },
