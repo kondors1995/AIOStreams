@@ -71,43 +71,61 @@ export function dashManifest(
  * on the largest size the connection is assumed to carry, as a trailer ends
  * before a cautious start climbs. Resolves to its teardown.
  */
-export async function playDash(
+export function playDash(
   video: HTMLVideoElement,
   url: string,
   onError: (message: string) => void
-): Promise<() => void> {
-  let shaka: (typeof import('shaka-player'))['default'];
-  let player: InstanceType<(typeof shaka)['Player']> | undefined;
-  try {
-    shaka = (await import('shaka-player')).default;
-    shaka.polyfill.installAll();
-    player = new shaka.Player();
-    await player.attach(video);
-  } catch (error) {
-    // Made but not attached, it still holds what its constructor set up.
+): () => void {
+  // After the teardown, nothing of this player is heard: the video may be
+  // another file's by then.
+  let gone = false;
+  let player:
+    | InstanceType<(typeof import('shaka-player'))['default']['Player']>
+    | undefined;
+  const fail = (message: string) => {
+    if (!gone) onError(message);
+  };
+  const codeOf = (error: unknown) =>
+    (error as { code?: number }).code ?? String(error);
+  void (async () => {
+    let shaka: (typeof import('shaka-player'))['default'];
+    try {
+      shaka = (await import('shaka-player')).default;
+      if (gone) return;
+      shaka.polyfill.installAll();
+      player = new shaka.Player();
+      await player.attach(video);
+    } catch (error) {
+      // Made but not attached, it still holds what its constructor set up.
+      void player?.destroy();
+      const code = codeOf(error);
+      fail(t`The trailer didn't load (error ${code})`);
+      return;
+    }
+    if (gone) return;
+    player.configure({
+      abr: { defaultBandwidthEstimate: 20_000_000 },
+      streaming: { bufferingGoal: 30, rebufferingGoal: 2 },
+    });
+    // Only what stops it: Shaka retries the rest itself.
+    player.addEventListener('error', (event) => {
+      const detail = (
+        event as unknown as { detail?: { code?: number; severity?: number } }
+      ).detail;
+      if (detail?.severity !== shaka.util.Error.Severity.CRITICAL) return;
+      const code = detail.code ?? '?';
+      fail(t`The trailer stopped (error ${code})`);
+    });
+    try {
+      await player.load(url);
+    } catch (error) {
+      const code = codeOf(error);
+      fail(t`The trailer didn't load (error ${code})`);
+    }
+  })();
+  // Ready at once, as a load can be left while it is still going.
+  return () => {
+    gone = true;
     void player?.destroy();
-    const code = (error as { code?: number }).code ?? String(error);
-    onError(t`The trailer didn't load (error ${code})`);
-    return () => {};
-  }
-  player.configure({
-    abr: { defaultBandwidthEstimate: 20_000_000 },
-    streaming: { bufferingGoal: 30, rebufferingGoal: 2 },
-  });
-  // Only what stops it: Shaka retries the rest itself.
-  player.addEventListener('error', (event) => {
-    const detail = (
-      event as unknown as { detail?: { code?: number; severity?: number } }
-    ).detail;
-    if (detail?.severity !== shaka.util.Error.Severity.CRITICAL) return;
-    const code = detail.code ?? '?';
-    onError(t`The trailer stopped (error ${code})`);
-  });
-  try {
-    await player.load(url);
-  } catch (error) {
-    const code = (error as { code?: number }).code ?? String(error);
-    onError(t`The trailer didn't load (error ${code})`);
-  }
-  return () => void player.destroy();
+  };
 }
