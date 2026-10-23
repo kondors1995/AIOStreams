@@ -241,6 +241,24 @@ export function onScreen(el: Element): boolean {
   );
 }
 
+let asked: [Element, (on: boolean) => void][] = [];
+
+/**
+ * Tells `answer` whether `el` is on screen, once the current commit is done and
+ * together with everyone else asking then: asked one by one while a page
+ * mounts, the browser lays it out again for each.
+ */
+export function whenOnScreen(el: Element, answer: (on: boolean) => void): void {
+  if (!asked.length)
+    void Promise.resolve().then(() => {
+      const batch = asked;
+      asked = [];
+      const seen = batch.map(([card]) => onScreen(card));
+      batch.forEach(([, reply], i) => reply(seen[i]));
+    });
+  asked.push([el, answer]);
+}
+
 /** Calls `onEntry` as the element comes near `root` (the screen when null) and leaves it. */
 export function watch(
   el: Element,

@@ -19,7 +19,12 @@ import {
   type PosterLine,
   type PosterSize,
 } from '../lib/settings';
-import { onScreen, RowScroller, ScrollRoot, watch } from '../lib/use-in-view';
+import {
+  RowScroller,
+  ScrollRoot,
+  watch,
+  whenOnScreen,
+} from '../lib/use-in-view';
 import { keyboardFocus } from '../lib/input';
 import { easeLayers, GLIDE_LAYERS } from '../lib/input/glide';
 
@@ -59,13 +64,21 @@ const reducedMotion =
 const CARD_IN = Array.from(
   { length: 20 },
   (_, i) => (el: HTMLElement | null) => {
-    if (!el || !onScreen(el)) return;
-    el.animate(
-      reducedMotion?.matches
-        ? { opacity: [0, 1] }
-        : { opacity: [0, 1], transform: ['translateY(8px)', 'none'] },
-      { duration: 300, delay: i * 25, easing: 'ease-out', fill: 'backwards' }
-    );
+    if (el)
+      whenOnScreen(el, (on) => {
+        if (!on || !el.isConnected) return;
+        el.animate(
+          reducedMotion?.matches
+            ? { opacity: [0, 1] }
+            : { opacity: [0, 1], transform: ['translateY(8px)', 'none'] },
+          {
+            duration: 300,
+            delay: i * 25,
+            easing: 'ease-out',
+            fill: 'backwards',
+          }
+        );
+      });
   }
 );
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { BiCheck, BiPlay } from 'react-icons/bi';
 import { cn } from '@aiostreams/ui/core/styling';
-import { onScreen, useNear } from '../lib/use-in-view';
+import { useNear, whenOnScreen } from '../lib/use-in-view';
 import {
   artworkKey,
   canShrink,
@@ -132,8 +132,12 @@ export function Artwork({
   const loaded = currentKey ? loadedKey === currentKey : !!early;
   const onLoad = (el: Element | null) => {
     if (!currentKey) return;
-    setUnseen(!!el && !onScreen(el));
-    setLoadedKey(currentKey);
+    const shown = (on: boolean) => {
+      setUnseen(!on);
+      setLoadedKey(currentKey);
+    };
+    if (el) whenOnScreen(el, shown);
+    else setLoadedKey(currentKey);
   };
   const imageClass = cn(
     // A focus's scale keeps up with focus; a loaded image fades in slower.
