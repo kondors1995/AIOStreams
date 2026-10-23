@@ -38,16 +38,24 @@ export function relativeTime(at: number | null | undefined): string {
   if (!at) return '';
   const diff = Date.now() - at;
   if (diff < 60_000) return t`just now`;
-  const format = new Intl.RelativeTimeFormat(formatLocale(), {
+  if (diff >= 7 * 86_400_000)
+    return new Date(at).toLocaleDateString(formatLocale());
+  const [count, unit] =
+    diff < 3_600_000
+      ? [Math.floor(diff / 60_000), 'minute' as const]
+      : diff < 86_400_000
+        ? [Math.floor(diff / 3_600_000), 'hour' as const]
+        : [Math.floor(diff / 86_400_000), 'day' as const];
+  // Chromium 69 (2020 Samsung TVs) has no RelativeTimeFormat.
+  if (!Intl.RelativeTimeFormat)
+    return unit === 'minute'
+      ? plural(count, { one: '# minute ago', other: '# minutes ago' })
+      : unit === 'hour'
+        ? plural(count, { one: '# hour ago', other: '# hours ago' })
+        : plural(count, { one: '# day ago', other: '# days ago' });
+  return new Intl.RelativeTimeFormat(formatLocale(), {
     style: 'short',
-  });
-  if (diff < 3_600_000)
-    return format.format(-Math.floor(diff / 60_000), 'minute');
-  if (diff < 86_400_000)
-    return format.format(-Math.floor(diff / 3_600_000), 'hour');
-  if (diff < 7 * 86_400_000)
-    return format.format(-Math.floor(diff / 86_400_000), 'day');
-  return new Date(at).toLocaleDateString(formatLocale());
+  }).format(-count, unit);
 }
 
 /** `S01E04`, or `E04` for absolute numbering. */

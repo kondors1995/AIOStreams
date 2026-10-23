@@ -27,6 +27,18 @@ msgstr "{cleared, plural, one {Removed # title from the history} other {Removed 
 msgid "{count, plural, one {# badge} other {# badges}}"
 msgstr "{count, plural, one {# badge} other {# badges}}"
 
+#: src/lib/format.ts
+msgid "{count, plural, one {# day ago} other {# days ago}}"
+msgstr "{count, plural, one {# day ago} other {# days ago}}"
+
+#: src/lib/format.ts
+msgid "{count, plural, one {# hour ago} other {# hours ago}}"
+msgstr "{count, plural, one {# hour ago} other {# hours ago}}"
+
+#: src/lib/format.ts
+msgid "{count, plural, one {# minute ago} other {# minutes ago}}"
+msgstr "{count, plural, one {# minute ago} other {# minutes ago}}"
+
 #: src/pages/settings/playback.tsx
 msgid "{count, plural, one {# minute} other {# minutes}}"
 msgstr "{count, plural, one {# minute} other {# minutes}}"
