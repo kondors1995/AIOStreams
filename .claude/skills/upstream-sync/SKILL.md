@@ -25,6 +25,28 @@ Background, commands and scripts for the TV are in `notes/` (a separate git repo
   main-thread time before without any test failing (forced layouts in Discover, a polyfill polling every frame).
 - Commit trailer: the one the session's attribution reminder gives.
 
+## 0. Is there already a sync PR?
+
+The fork watches upstream by itself. `.github/workflows/upstream-watch.yml` runs at 00:00 UTC every day and compares
+Viren070's latest `smart-tv-v*` release with the version in `packages/smart-tv/package.json`; a newer one starts
+`upstream-sync.yml`, which merges that tag onto the branch **`aio-upstream`**, runs `verify-before-tv.sh` in CI
+(Chromium 69 snapshot 576753, unsigned package), and opens or updates **one pull request** from `aio-upstream` to
+`tizen-5.5` with the `.wgt` as an artifact (a draft when the checks fail). Before merging by hand, look:
+
+```sh
+gh pr list -R kondors1995/AIOStreams --head aio-upstream
+git fetch sov aio-upstream && git switch aio-upstream     # the merged, already-checked branch
+```
+
+If there is one, skip steps 1-3 (CI did them; read the PR for what it settled: upstream's workflows dropped, the lockfile
+regenerated, the Weblate catalogs taken) and go to step 4's scan for the commits it brought, then step 5 (install the
+artifact or build locally, **profile on the TV**), then merge the PR and release (step 6). Re-sign the artifact for the TV
+(`notes/pr-1546.md`). A run that failed on conflicts pushed nothing: the run summary lists the files; do steps 1-3 by hand.
+To start over: close the PR and `git push sov --delete aio-upstream`. Run by hand: `gh workflow run upstream-sync.yml -f tag=smart-tv-vX.Y.Z`.
+A scheduled workflow is switched off after 60 days without repository activity, and the push to `aio-upstream` needs
+the default token to be allowed to write workflow-touching history: if it is refused, add a `SYNC_TOKEN` secret (a personal
+access token with `repo` and `workflow`).
+
 ## 1. Look before merging
 
 ```sh
