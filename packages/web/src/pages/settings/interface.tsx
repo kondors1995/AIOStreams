@@ -185,6 +185,7 @@ export function InterfaceSection() {
   const views = useViews();
   const [featured, setFeatured] = useSetting(settings.interface.featured);
   const [heroMode, setHeroMode] = useSetting(settings.interface.heroMode);
+  const [openCards, setOpenCards] = useSetting(settings.interface.openCards);
   const [mergeNextUp, setMergeNextUp] = useSetting(
     settings.interface.mergeNextUp
   );
@@ -264,19 +265,19 @@ export function InterfaceSection() {
               value: 'corner',
               label: t`Follows the selected card, in the corner`,
             },
-            // A remote's focus opens the cards; elsewhere it rotates.
-            ...(currentHost().tv
-              ? [
-                  {
-                    value: 'open',
-                    label: t`Opens the selected card out, with its details`,
-                  },
-                ]
-              : []),
           ]}
           value={heroMode}
           onValueChange={(value) => setHeroMode(value as HeroMode)}
         />
+        {currentHost().tv && (
+          <Switch
+            side="right"
+            label={t`Open cards`}
+            help={t`The poster focus rests on opens out to its landscape picture, with its details under it and its trailer after a moment, in the rows and the grid of Discover.`}
+            value={openCards}
+            onValueChange={setOpenCards}
+          />
+        )}
         <Switch
           side="right"
           label={t`Merge continue watching and next up`}

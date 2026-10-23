@@ -2688,6 +2688,10 @@ msgstr "Opacity: {backgroundOpacity}%"
 msgid "Open"
 msgstr "Open"
 
+#: src/pages/settings/interface.tsx
+msgid "Open cards"
+msgstr "Open cards"
+
 #: src/pages/downloads.tsx
 #: src/pages/settings/apps.tsx
 msgid "Open folder"
@@ -2716,10 +2720,6 @@ msgstr "Open the app's downloads"
 #: src/lib/input/actions.ts
 msgid "Opens the menu of what is selected, as a right click does."
 msgstr "Opens the menu of what is selected, as a right click does."
-
-#: src/pages/settings/interface.tsx
-msgid "Opens the selected card out, with its details"
-msgstr "Opens the selected card out, with its details"
 
 #: src/pages/settings/playback.tsx
 msgid "Opens versions in {target}, which brings you back here with your place saved."
@@ -4417,6 +4417,10 @@ msgstr "The player's subtitle menu lists subtitles in your languages, ones witho
 #: src/components/playlists.tsx
 msgid "The playlist goes; the titles in it stay."
 msgstr "The playlist goes; the titles in it stay."
+
+#: src/pages/settings/interface.tsx
+msgid "The poster focus rests on opens out to its landscape picture, with its details under it and its trailer after a moment, in the rows and the grid of Discover."
+msgstr "The poster focus rests on opens out to its landscape picture, with its details under it and its trailer after a moment, in the rows and the grid of Discover."
 
 #: src/lib/party/party.ts
 msgid "The relay could not read that."

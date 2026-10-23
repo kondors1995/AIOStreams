@@ -139,8 +139,9 @@ export function HomePage() {
     '(min-width: 1024px) and (hover: hover) and (pointer: fine)'
   );
   const canFollow = pointer || !!currentHost().tv;
-  // Opening the focused card is for a remote; elsewhere it rotates.
-  const open = heroMode === 'open' && !!currentHost().tv;
+  // Opening the focused card is for a remote.
+  const [openCards] = useSetting(settings.interface.openCards);
+  const open = openCards && !!currentHost().tv;
   const follow = (heroMode === 'follow' || heroMode === 'corner') && canFollow;
 
   const rows = (
@@ -193,21 +194,22 @@ export function HomePage() {
       >
         <div
           data-ui="home-rows"
-          className="space-y-10 px-4 pb-16 pt-8 lg:ps-0 lg:pe-10"
+          className={cn(
+            'space-y-10 px-4 pb-16 pt-8 lg:ps-0 lg:pe-10',
+            open && '[--card-h:18rem]'
+          )}
         >
           {rows}
         </div>
       </FollowHero>
     );
-  // Opening cards show their own details, so no hero stands over the rows.
-  const hero = !open;
   return (
     <div className={cn('pb-16', noCatalogs && ['flex flex-col', FILL_WINDOW])}>
-      {hero && <Hero items={heroItems} loading={heroLoading} />}
+      <Hero items={heroItems} loading={heroLoading} />
       <div
         data-ui="home-rows"
         className={cn(
-          hero && (heroItems.length || heroLoading)
+          heroItems.length || heroLoading
             ? 'relative z-[1] space-y-10 px-4 pt-2 lg:ps-0 lg:pe-10'
             : 'relative z-[1] space-y-10 px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] lg:ps-0 lg:pe-10 lg:pt-[calc(2.5rem+env(safe-area-inset-top))]',
           noCatalogs && 'flex flex-1 flex-col',
@@ -338,7 +340,7 @@ function LibraryRow({
 }: {
   view: BaseItemDto;
   first: boolean;
-  /** Posters open out on focus (the "open" hero mode). */
+  /** Posters open out on focus (the open cards setting). */
   open: boolean;
 }) {
   const { client } = useSession();
@@ -380,7 +382,6 @@ function LibraryRow({
       }
       shape={landscape ? 'wide' : 'poster'}
       itemClass={opens ? OPEN_ROW_ITEM : undefined}
-      screen={opens}
       loading={!near || (!pages.data && !pages.isError)}
       waiting={!near}
       loadingMore={isFetchingNextPage}

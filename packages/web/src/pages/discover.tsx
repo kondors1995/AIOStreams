@@ -198,9 +198,9 @@ export function DiscoverPage({
   const all = views.data?.Items ?? [];
   const view = all.find((v) => v.Id === viewId);
   const [filter, setFilter] = React.useState<ItemFilter | undefined>();
-  // As the home's rows: a TV's posters open out where the hero opens cards.
-  const [heroMode] = useSetting(settings.interface.heroMode);
-  const opens = heroMode === 'open' && !!currentHost().tv;
+  // As the home's rows: a TV's posters open out.
+  const [openCards] = useSetting(settings.interface.openCards);
+  const opens = openCards && !!currentHost().tv;
 
   const current: Kind = (KINDS.find((k) => k.kind === kind)?.kind ??
     kindOf(view) ??

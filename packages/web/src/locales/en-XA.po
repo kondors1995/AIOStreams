@@ -2688,6 +2688,10 @@ msgstr ""
 msgid "Open"
 msgstr ""
 
+#: src/pages/settings/interface.tsx
+msgid "Open cards"
+msgstr ""
+
 #: src/pages/downloads.tsx
 #: src/pages/settings/apps.tsx
 msgid "Open folder"
@@ -2715,10 +2719,6 @@ msgstr ""
 
 #: src/lib/input/actions.ts
 msgid "Opens the menu of what is selected, as a right click does."
-msgstr ""
-
-#: src/pages/settings/interface.tsx
-msgid "Opens the selected card out, with its details"
 msgstr ""
 
 #: src/pages/settings/playback.tsx
@@ -4416,6 +4416,10 @@ msgstr ""
 
 #: src/components/playlists.tsx
 msgid "The playlist goes; the titles in it stay."
+msgstr ""
+
+#: src/pages/settings/interface.tsx
+msgid "The poster focus rests on opens out to its landscape picture, with its details under it and its trailer after a moment, in the rows and the grid of Discover."
 msgstr ""
 
 #: src/lib/party/party.ts

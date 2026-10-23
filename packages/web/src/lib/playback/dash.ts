@@ -13,6 +13,23 @@ export const isDash = (url: string) => url.startsWith(PREFIX);
 
 export const dashAddress = (manifest: string) => PREFIX + btoa(manifest);
 
+/**
+ * The manifest at `url` without its sizes taller than `max`, as for a card
+ * that draws a trailer small; as it was where none would be left.
+ */
+export function capHeight(url: string, max: number): string {
+  if (!isDash(url)) return url;
+  const manifest = atob(url.slice(PREFIX.length));
+  const capped = manifest.replace(
+    /<Representation\b[^>]*\bheight="(\d+)"[^>]*>[\s\S]*?<\/Representation>/g,
+    (representation, height: string) =>
+      Number(height) > max ? '' : representation
+  );
+  return /contentType="video"[^>]*><Representation/.test(capped)
+    ? dashAddress(capped)
+    : url;
+}
+
 /** One stream of a manifest: a whole file, indexed by its own `sidx`. */
 export interface DashStream {
   id: string;
@@ -67,6 +84,26 @@ export function dashManifest(
 /* eslint-enable lingui/no-unlocalized-strings */
 
 /**
+ * Loads Shaka ahead, and asks the TV what Shaka will ask it as a trailer
+ * starts: a Samsung TV loads its product-info plugin at the first such
+ * question, most of a second, so a first trailer doesn't wait on either.
+ */
+export const preloadShaka = () =>
+  void import('shaka-player')
+    .then(() => {
+      const info = (
+        window as { webapis?: { productinfo?: Record<string, () => unknown> } }
+      ).webapis?.productinfo;
+      for (const question of ['is8KPanelSupported', 'isHdrTvSupport'])
+        try {
+          info?.[question]?.();
+        } catch {
+          // Only a head start: Shaka asks again, and copes with no answer.
+        }
+    })
+    .catch(() => {});
+
+/**
  * Plays the manifest at `url` in `video`, Shaka fetched only then. It starts
  * on the largest size the connection is assumed to carry, as a trailer ends
  * before a cautious start climbs. Resolves to its teardown.
@@ -92,7 +129,21 @@ export function playDash(
     try {
       shaka = (await import('shaka-player')).default;
       if (gone) return;
+      const native = 'requestVideoFrameCallback' in HTMLVideoElement.prototype;
       shaka.polyfill.installAll();
+      // Shaka's stand-in for it asks the video how many frames it drew on every
+      // frame, which costs a Samsung TV (Chromium 69) most of a second as a
+      // trailer starts; Shaka carries on without it.
+      if (!native) {
+        Reflect.deleteProperty(
+          HTMLVideoElement.prototype,
+          'requestVideoFrameCallback'
+        );
+        Reflect.deleteProperty(
+          HTMLVideoElement.prototype,
+          'cancelVideoFrameCallback'
+        );
+      }
       player = new shaka.Player();
       await player.attach(video);
     } catch (error) {

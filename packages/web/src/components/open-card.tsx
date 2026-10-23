@@ -8,25 +8,34 @@ import { duration, itemTitle, progressOf, ticksToMs } from '../lib/format';
 import type { BaseItemDto } from '../lib/types';
 import { Anchor } from './anchor';
 import { easeLayers } from '../lib/input/glide';
-import { capHeight, isDash, playDash } from '../lib/playback/dash';
-import { trailersOf, useTrailerPlayback } from '../lib/playback/trailers';
+import {
+  capHeight,
+  isDash,
+  playDash,
+  preloadShaka,
+} from '../lib/playback/dash';
+import { blackBars } from '../lib/playback/bars';
+import {
+  trailersOf,
+  useTrailerPlayback,
+  youTubeId,
+} from '../lib/playback/trailers';
 import { Artwork, ProgressBar, WatchedMark } from './cards';
 
 /**
  * The home's "opens" hero mode on a TV: a row of posters whose focused one,
- * once focus rests on it, opens out to its landscape picture, a little taller,
- * with its details under it. The slide changes shape at once, in CSS on its
- * `data-open`, so the row lays out once; what moves is then eased on the
- * compositor from where it was drawn: the cards after it slide over,
- * uncovering its width, and it grows from the poster's height.
+ * once focus rests on it, opens out to its landscape picture,  * with its details under it, as tall as the poster. The slide changes shape at
+ * once, in CSS on its `data-open`, so the row lays out once; the cards after it
+ * are then eased on the compositor from where they were drawn, sliding over to
+ * uncover its width.
  */
 
 /*
  * Sizes follow `--card-h`, a poster's height, which the home sets: a 2:3
- * poster, opened 16:9 and 15% taller. Each slide's width counts its padding.
+ * poster, opened 16:9 at the same height. Each slide's width counts its padding.
  */
 export const OPEN_ROW_ITEM =
-  'basis-[calc(var(--card-h)*2/3+1rem)] data-[open]:basis-[calc(var(--card-h)*1.15*16/9+1rem)]';
+  'basis-[calc(var(--card-h)*2/3+1rem)] data-[open]:basis-[calc(var(--card-h)*16/9+1rem)]';
 
 /** How long focus rests on a card before it opens. */
 export const OPEN_DELAY_MS = 700;
@@ -37,7 +46,7 @@ export const OPEN_DELAY_MS = 700;
  */
 export const READY_MS = 400;
 /** How long an opened card shows its picture before its trailer plays. */
-export const TRAILER_DELAY_MS = 2500;
+export const TRAILER_DELAY_MS = 1300;
 /** A card draws its trailer about 590px wide: no larger size is worth fetching. */
 const TRAILER_HEIGHT = 720;
 /** The cards after an opening one that slide in view, at most. */
@@ -71,8 +80,9 @@ function following(slide: HTMLElement): HTMLElement[] {
 }
 
 /**
- * Layers for the card that will grow and those that will slide, made before
- * rather than as they start.
+ * Layers for the cards that will slide, made before rather than as they
+ * start, and for the frame: a Samsung TV draws a trailer's picture only
+ * inside a frame of its own layer (the sound alone plays otherwise).
  */
 function layered(slide: HTMLElement, on: boolean): void {
   const frame = slide.querySelector<HTMLElement>('[data-ui=open-card-image]');
@@ -83,17 +93,14 @@ function layered(slide: HTMLElement, on: boolean): void {
 /** Opens or closes `slide` at once, then eases what that moved. */
 function reshape(slide: HTMLElement, open: boolean): void {
   const row = slide.parentElement;
-  const frame = slide.querySelector<HTMLElement>('[data-ui=open-card-image]');
   const scroller = row?.closest<HTMLElement>('[data-nav-self-scroll]');
-  if (!row || !frame || !scroller || still()) {
+  if (!row || !scroller || still()) {
     slide.toggleAttribute('data-open', open);
     return;
   }
   const after = following(slide);
   const lefts = after.map((el) => el.offsetLeft);
-  const was = frame.getBoundingClientRect();
   slide.toggleAttribute('data-open', open);
-  const now = frame.getBoundingClientRect();
   const timing = { duration: OPEN_MS, easing: EASE };
   // Past the view's right edge nothing is seen moving.
   const end = scroller.scrollLeft + scroller.clientWidth - row.offsetLeft;
@@ -106,15 +113,6 @@ function reshape(slide: HTMLElement, open: boolean): void {
     );
   });
   if (!open) return;
-  // On the compositor too, with the same timing: the card is drawn opened at
-  // once, the card after it sliding off uncovers its width, and it grows to
-  // its height from the poster's, keeping its left edge and its middle.
-  // eslint-disable-next-line lingui/no-unlocalized-strings -- CSS
-  frame.style.transformOrigin = 'left center';
-  frame.animate(
-    [{ transform: `scale(${was.height / now.height})` }, { transform: 'none' }],
-    timing
-  );
   reveal(slide, row, scroller);
 }
 
@@ -213,6 +211,22 @@ export function OpenTrailer({ item }: { item: BaseItemDto }) {
   }, [unplayable, trailer?.url]);
   const video = React.useRef<HTMLVideoElement>(null);
   const [shown, setShown] = React.useState(false);
+  // How much larger than the card the picture is drawn, to crop the black bars
+  // a trailer carries in its own frames (a widescreen film in 16:9).
+  const [zoom, setZoom] = React.useState(1);
+  const trailerUrl = trailer?.url;
+  React.useEffect(() => {
+    setZoom(1);
+    const id = trailerUrl ? youTubeId(trailerUrl) : null;
+    if (!id) return;
+    let gone = false;
+    void blackBars(id).then((bar) => {
+      if (!gone) setZoom(1 / (1 - 2 * bar));
+    });
+    return () => {
+      gone = true;
+    };
+  }, [trailerUrl]);
   React.useEffect(() => {
     const el = video.current;
     if (!el || !url) return;
@@ -241,13 +255,7 @@ export function OpenTrailer({ item }: { item: BaseItemDto }) {
     el.addEventListener('ended', onEnded);
     el.addEventListener('canplay', onCanPlay);
     el.addEventListener('error', fail);
-    if (isDash(url))
-      void playDash(el, capHeight(url, TRAILER_HEIGHT), fail).then(
-        (teardown) => {
-          if (gone) teardown();
-          else stop = teardown;
-        }
-      );
+    if (isDash(url)) stop = playDash(el, capHeight(url, TRAILER_HEIGHT), fail);
     else el.src = url;
     return () => {
       gone = true;
@@ -267,8 +275,15 @@ export function OpenTrailer({ item }: { item: BaseItemDto }) {
       data-ui="open-card-trailer"
       autoPlay
       playsInline
+      // Larger than the card and centred, its overflow clipped by the frame.
+      style={{
+        width: `${zoom * 100}%`,
+        height: `${zoom * 100}%`,
+        left: `${(1 - zoom) * 50}%`,
+        top: `${(1 - zoom) * 50}%`,
+      }}
       className={cn(
-        'pointer-events-none absolute inset-0 h-full w-full object-cover transition-opacity duration-500',
+        'pointer-events-none absolute object-cover transition-opacity duration-500',
         shown ? 'opacity-100' : 'opacity-0'
       )}
     />
@@ -296,6 +311,11 @@ export function OpenCard({ href, item }: { href: string; item: BaseItemDto }) {
     setReady(false);
     setTrailer(false);
   };
+  // Once the page is idle, so the first trailer isn't the one to load Shaka.
+  React.useEffect(() => {
+    const idle = requestIdleCallback(preloadShaka, { timeout: 5000 });
+    return () => cancelIdleCallback(idle);
+  }, []);
   // A slide left open by a card no longer drawn would hold its width.
   React.useEffect(
     () => () => {
@@ -335,20 +355,19 @@ export function OpenCard({ href, item }: { href: string; item: BaseItemDto }) {
       onBlur={close}
       className="group/open block"
     >
-      {/* As tall as an opened card, which a poster sits in the middle of. */}
-      <div className="flex h-[calc(var(--card-h)*1.15)] items-center">
+      {/* An opened card is as tall as the poster, so only its width changes. */}
+      <div className="h-[--card-h]">
         <div
           data-ui="open-card-image"
           data-focus-frame
-          className="relative h-[--card-h] w-full overflow-hidden rounded-lg bg-gray-900 ring-1 ring-white/5 [[data-open]_&]:h-[calc(var(--card-h)*1.15)]"
+          className="relative h-full w-full overflow-hidden rounded-lg bg-gray-900 ring-1 ring-white/5"
         >
           {/*
-            Laid out at its opened size from the start, centred as the frame
-            grows, so opening neither measures nor asks for it again; drawn
-            under the poster until then.
+            Laid out at its opened size from the start, so opening neither
+            measures nor asks for it again; drawn under the poster until then.
           */}
           {ready && (
-            <div className="absolute left-0 top-[calc(50%-var(--card-h)*0.575)] h-[calc(var(--card-h)*1.15)] w-[calc(var(--card-h)*1.15*16/9)]">
+            <div className="absolute inset-y-0 left-0 w-[calc(var(--card-h)*16/9)]">
               <Artwork
                 src={(width) =>
                   landscapeUrls(client, item, { maxWidth: width })
