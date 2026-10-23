@@ -106,6 +106,8 @@ function lens(width: number, height: number, radius: number): Lens | null {
 function endSize(el: HTMLElement): { width: number; height: number } | null {
   let width: number | undefined;
   let height: number | undefined;
+  // Chromium 84; before it there is nothing to wait for.
+  if (typeof el.getAnimations !== 'function') return null;
   for (const animation of el.getAnimations()) {
     if (!(animation.effect instanceof KeyframeEffect)) continue;
     const end = animation.effect.getKeyframes().at(-1);
