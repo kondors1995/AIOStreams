@@ -83,25 +83,32 @@ export function dashManifest(
 }
 /* eslint-enable lingui/no-unlocalized-strings */
 
+/** Loads Shaka ahead, so a first trailer doesn't wait on loading and parsing it. */
+export const preloadShaka = () => void import('shaka-player').catch(() => {});
+
 /**
- * Loads Shaka ahead, and asks the TV what Shaka will ask it as a trailer
- * starts: a Samsung TV loads its product-info plugin at the first such
- * question, most of a second, so a first trailer doesn't wait on either.
+ * Answers Shaka's questions about the TV's panel ourselves: no 4K or 8K, no
+ * HDR, as these trailers play at 1080p or less. Its Tizen checks otherwise
+ * load Samsung's product-info and AV-info plugins, most of a second as a
+ * first trailer starts.
  */
-export const preloadShaka = () =>
-  void import('shaka-player')
-    .then(() => {
-      const info = (
-        window as { webapis?: { productinfo?: Record<string, () => unknown> } }
-      ).webapis?.productinfo;
-      for (const question of ['is8KPanelSupported', 'isHdrTvSupport'])
-        try {
-          info?.[question]?.();
-        } catch {
-          // Only a head start: Shaka asks again, and copes with no answer.
-        }
-    })
-    .catch(() => {});
+function answerForTv(): void {
+  const webapis = (
+    window as { webapis?: Record<string, Record<string, unknown> | undefined> }
+  ).webapis;
+  const asked: Record<string, string[]> = {
+    productinfo: ['is8KPanelSupported', 'isUdPanelSupported'],
+    avinfo: ['isHdrTvSupport'],
+  };
+  for (const [namespace, questions] of Object.entries(asked))
+    for (const question of questions)
+      try {
+        const api = webapis?.[namespace];
+        if (api?.[question]) api[question] = () => false;
+      } catch {
+        // Left as it was: Shaka asks the TV.
+      }
+}
 
 /**
  * Plays the manifest at `url` in `video`, Shaka fetched only then. It starts
@@ -130,6 +137,7 @@ export function playDash(
       shaka = (await import('shaka-player')).default;
       if (gone) return;
       const native = 'requestVideoFrameCallback' in HTMLVideoElement.prototype;
+      answerForTv();
       shaka.polyfill.installAll();
       // Shaka's stand-in for it asks the video how many frames it drew on every
       // frame, which costs a Samsung TV (Chromium 69) most of a second as a
