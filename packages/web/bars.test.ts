@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { barsIn, combineBars } from './src/lib/playback/bars.ts';
+import {
+  barsIn,
+  combineBars,
+  edgesIn,
+  zoomFor,
+} from './src/lib/playback/bars.ts';
 
 const W = 96;
 const H = 54;
@@ -97,4 +102,47 @@ test('two frames take the smaller, one is trusted, none is none, and there is a 
   assert.equal(combineBars([0, 0, 0]), 0);
   assert.equal(combineBars([]), 0);
   assert.equal(combineBars([0.45, 0.45, 0.45]), 0.3);
+});
+
+/** A 320x180 frame with `rows` black rows top and bottom and `cols` black columns at each side. */
+function framed(rows: number, cols: number): Uint8ClampedArray {
+  const w = 320;
+  const h = 180;
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const bar = y < rows || y >= h - rows || x < cols || x >= w - cols;
+      data.set(
+        [bar ? 0 : 120, bar ? 0 : 120, bar ? 0 : 120, 255],
+        (y * w + x) * 4
+      );
+    }
+  return data;
+}
+
+test('finds a letterbox, a pillarbox, and both at once', () => {
+  assert.deepEqual(edgesIn(framed(22, 0), 320, 180), {
+    rows: 22 / 180,
+    cols: 0,
+  });
+  assert.deepEqual(edgesIn(framed(0, 40), 320, 180), {
+    rows: 0,
+    cols: 40 / 320,
+  });
+  // NCIS: a 16:9 picture letterboxed in a 4:3 video, as YouTube draws it in 16:9.
+  assert.deepEqual(edgesIn(framed(22, 40), 320, 180), {
+    rows: 22 / 180,
+    cols: 40 / 320,
+  });
+});
+
+test('the zoom fills the card from whichever bars need it more', () => {
+  const near = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+  // A 2.35:1 film in 16:9: the rows decide.
+  assert.ok(near(zoomFor(22 / 180, 0), 1 / (1 - 44 / 180)));
+  // A 4:3 show: the columns, 4/3 (what `cover` does at the card's size).
+  assert.ok(near(zoomFor(0, 40 / 320), 1 / (1 - 80 / 320)));
+  // NCIS: the pillarbox's 4/3, the letterbox's 1.32 inside it.
+  assert.ok(near(zoomFor(22 / 180, 40 / 320), 4 / 3));
+  assert.equal(zoomFor(0, 0), 1);
 });
