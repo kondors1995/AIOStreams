@@ -966,7 +966,7 @@ const SeasonPosters = React.memo(function SeasonPosters({
                   {s.UserData?.Played && (
                     <span
                       data-ui="watched-badge"
-                      className="absolute end-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-brand-500 text-white"
+                      className="absolute end-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-brand-500 text-on-brand"
                     >
                       <BiCheck />
                     </span>

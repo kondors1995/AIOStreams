@@ -5165,6 +5165,7 @@ msgid "While you're in it"
 msgstr ""
 
 #: src/lib/i18n.ts
+#: src/pages/settings/theme.tsx
 msgid "White"
 msgstr ""
 

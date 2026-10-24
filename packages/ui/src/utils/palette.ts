@@ -1,7 +1,8 @@
 import { colord, extend } from 'colord';
+import a11yPlugin from 'colord/plugins/a11y';
 import mixPlugin from 'colord/plugins/mix';
 
-extend([mixPlugin]);
+extend([mixPlugin, a11yPlugin]);
 
 export const DEFAULT_BACKGROUND = '#070707';
 export const DEFAULT_ACCENT = '#6152df';
@@ -22,6 +23,8 @@ export const THEME_PRESETS: ThemePreset[] = [
   { name: 'Crimson', background: '#0c0d10', accent: '#8c1d1d' },
   { name: 'Rainforest', background: '#050d0c', accent: '#1d975a' },
   { name: 'Ocean', background: '#050a0d', accent: '#1a72a8' },
+  // As Netflix's TV app: white marks focus, selection and the main button.
+  { name: 'White', background: '#0b0b0b', accent: '#ffffff' },
 ];
 
 const rgb = (color: ReturnType<typeof colord>) => {
@@ -79,6 +82,9 @@ export function themeVariables(opts: {
     for (const [step, towards, amount] of brand)
       vars[`--color-brand-${step}`] = rgb(accent.mix(towards, amount));
     vars['--brand'] = accent.mix('#ffffff', 0.35).toHex();
+    // What reads on a brand fill: white, but dark on an accent as light as white's.
+    vars['--color-on-brand'] =
+      accent.luminance() > 0.6 ? '10 10 10' : '255 255 255';
   }
   return vars;
 }

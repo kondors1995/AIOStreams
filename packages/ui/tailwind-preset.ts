@@ -385,6 +385,8 @@ const preset: Omit<Config, 'content'> = {
         md: '0 1px 3px 0 rgba(0, 0, 0, 0.1),0 1px 2px 0 rgba(0, 0, 0, 0.06)',
       },
       colors: {
+        // Text on a brand fill: white, or dark where the accent is light.
+        'on-brand': 'rgb(var(--color-on-brand) / <alpha-value>)',
         brand: {
           50: 'rgb(var(--color-brand-50) / <alpha-value>)',
           100: 'rgb(var(--color-brand-100) / <alpha-value>)',

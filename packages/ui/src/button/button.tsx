@@ -20,7 +20,7 @@ export const ButtonAnatomy = defineStyleAnatomy({
       variants: {
         intent: {
           primary:
-            'text-white border bg-brand-500 border-brand-400/20 active:bg-opacity-100 dark:bg-opacity-70 dark:hover:bg-opacity-90',
+            'text-on-brand border bg-brand-500 border-brand-400/20 active:bg-opacity-100 dark:bg-opacity-70 dark:hover:bg-opacity-90',
           'primary-outline':
             'text-[--brand] border border-brand-500/40 bg-transparent hover:bg-brand-500/10 active:bg-brand-500/20 dark:border-brand-400/30 dark:hover:bg-brand-500/15 dark:active:bg-brand-500/25',
           'primary-subtle':
