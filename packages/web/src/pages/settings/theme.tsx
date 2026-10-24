@@ -41,6 +41,7 @@ const presetName = (name: string) =>
     Crimson: t`Crimson`,
     Rainforest: t`Rainforest`,
     Ocean: t`Ocean`,
+    White: t`White`,
   })[name] ?? name;
 
 export function ThemeSection() {

@@ -601,7 +601,7 @@ function InParty({ state }: { state: PartyState }) {
             {state.unread > 0 && tab !== 'chat' && (
               <span
                 data-ui="party-unread"
-                className="rounded-full bg-brand-500 px-1.5 text-xs font-semibold leading-5 text-white"
+                className="rounded-full bg-brand-500 px-1.5 text-xs font-semibold leading-5 text-on-brand"
               >
                 {state.unread}
               </span>

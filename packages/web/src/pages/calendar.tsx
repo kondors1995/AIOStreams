@@ -178,7 +178,7 @@ function DayCell({
         className={cn(
           'relative flex size-7 items-center justify-center rounded-full text-sm font-semibold',
           today
-            ? 'bg-brand-500 text-white'
+            ? 'bg-brand-500 text-on-brand'
             : 'text-gray-200 [text-shadow:0_1px_3px_rgb(0_0_0/0.8)]'
         )}
       >
@@ -313,7 +313,7 @@ function Agenda({
       data-ui="calendar-today-line"
       className={cn('flex items-center gap-2', START)}
     >
-      <span className="rounded-full bg-brand-500 px-2.5 py-0.5 text-xs font-semibold text-white">
+      <span className="rounded-full bg-brand-500 px-2.5 py-0.5 text-xs font-semibold text-on-brand">
         <Trans>Today</Trans>
       </span>
       <span className="h-px flex-1 bg-brand-500" />
