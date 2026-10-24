@@ -17,6 +17,7 @@ import {
 import { blackBars } from '../lib/playback/bars';
 import {
   trailersOf,
+  usePrefetchTrailer,
   useTrailerPlayback,
   youTubeId,
 } from '../lib/playback/trailers';
@@ -47,6 +48,16 @@ export const OPEN_DELAY_MS = 700;
 export const READY_MS = 400;
 /** How long an opened card shows its picture before its trailer plays. */
 export const TRAILER_DELAY_MS = 1300;
+/**
+ * When its trailer starts loading, paused, so that playing it at
+ * `OPEN_DELAY_MS + TRAILER_DELAY_MS` finds it buffered: once the card has
+ * finished opening, as loading while it eases would stutter it.
+ */
+export const TRAILER_LOAD_MS = 1100;
+/** A card's trailer starts once this much is buffered: it is short, and the connection fast. */
+const TRAILER_START_SECONDS = 0.5;
+/** And keeps this far ahead: card trailers load for a card that may be left, so little. */
+const TRAILER_BUFFER_SECONDS = 8;
 /** A card draws its trailer about 590px wide: no larger size is worth fetching. */
 const TRAILER_HEIGHT = 720;
 /** The cards after an opening one that slide in view, at most. */
@@ -149,6 +160,10 @@ export function OpenDetails({ item }: { item: BaseItemDto }) {
   // The rows leave out the overview and genres.
   const details = useItem(item.Id ?? '');
   const full = details.data ?? item;
+  // Also asks for its trailer's address now, so loading it later skips that.
+  const prefetch = usePrefetchTrailer();
+  const first = details.data ? trailersOf(details.data)[0]?.url : undefined;
+  React.useEffect(() => prefetch(first), [first]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div
       data-ui="open-card-details"
@@ -192,12 +207,20 @@ export function OpenTitle({ item }: { item: BaseItemDto }) {
 
 /**
  * The title's trailer over the opened card's picture, with sound, shown once
- * it plays and gone as it ends, back to the picture. Shaka plays a DASH one
+ * it plays and gone as it ends, back to the picture. It loads paused and plays
+ * when `play` says, so that is quick. Shaka plays a DASH one
  * (a Samsung TV's), held to 720p; others play as they are. One that won't
  * play, as a YouTube video taken down or out of reach, gives way to the
  * title's next, before it starts; one failing after leaves the picture.
  */
-export function OpenTrailer({ item }: { item: BaseItemDto }) {
+export function OpenTrailer({
+  item,
+  play,
+}: {
+  item: BaseItemDto;
+  /** Loaded and buffered paused until this is true. */
+  play: boolean;
+}) {
   const details = useItem(item.Id ?? '');
   const trailers = details.data ? trailersOf(details.data) : [];
   const [at, setAt] = React.useState(0);
@@ -210,10 +233,17 @@ export function OpenTrailer({ item }: { item: BaseItemDto }) {
     if (unplayable) setAt((i) => i + 1);
   }, [unplayable, trailer?.url]);
   const video = React.useRef<HTMLVideoElement>(null);
+  const wanted = React.useRef(play);
+  wanted.current = play;
   const [shown, setShown] = React.useState(false);
   // How much larger than the card the picture is drawn, to crop the black bars
   // a trailer carries in its own frames (a widescreen film in 16:9).
   const [zoom, setZoom] = React.useState(1);
+  // Plays what is loaded, the moment `play` turns true.
+  const startNow = React.useRef(() => {});
+  React.useEffect(() => {
+    if (play) startNow.current();
+  }, [play]);
   const trailerUrl = trailer?.url;
   React.useEffect(() => {
     setZoom(1);
@@ -245,17 +275,24 @@ export function OpenTrailer({ item }: { item: BaseItemDto }) {
     const onEnded = () => setShown(false);
     // A TV refusing to start it with sound starts it muted instead.
     const onCanPlay = () => {
-      if (el.paused)
+      if (el.paused && wanted.current)
         el.play().catch(() => {
           el.muted = true;
           void el.play().catch(() => {});
         });
     };
+    startNow.current = () => {
+      if (el.readyState >= 3) onCanPlay();
+    };
     el.addEventListener('playing', onPlaying);
     el.addEventListener('ended', onEnded);
     el.addEventListener('canplay', onCanPlay);
     el.addEventListener('error', fail);
-    if (isDash(url)) stop = playDash(el, capHeight(url, TRAILER_HEIGHT), fail);
+    if (isDash(url))
+      stop = playDash(el, capHeight(url, TRAILER_HEIGHT), fail, {
+        startSeconds: TRAILER_START_SECONDS,
+        bufferSeconds: TRAILER_BUFFER_SECONDS,
+      });
     else el.src = url;
     return () => {
       gone = true;
@@ -273,7 +310,6 @@ export function OpenTrailer({ item }: { item: BaseItemDto }) {
     <video
       ref={video}
       data-ui="open-card-trailer"
-      autoPlay
       playsInline
       // Larger than the card and centred, its overflow clipped by the frame.
       style={{
@@ -293,7 +329,8 @@ export function OpenTrailer({ item }: { item: BaseItemDto }) {
 export function OpenCard({ href, item }: { href: string; item: BaseItemDto }) {
   const { client } = useSession();
   const [ready, setReady] = React.useState(false);
-  const [trailer, setTrailer] = React.useState(false);
+  const [loadTrailer, setLoadTrailer] = React.useState(false);
+  const [playTrailer, setPlayTrailer] = React.useState(false);
   const ref = React.useRef<HTMLAnchorElement>(null);
   const timers = React.useRef<ReturnType<typeof setTimeout>[]>([]);
   const slide = () =>
@@ -312,7 +349,8 @@ export function OpenCard({ href, item }: { href: string; item: BaseItemDto }) {
     if (el)
       timers.current.push(setTimeout(() => layered(el, false), OPEN_MS + 50));
     setReady(false);
-    setTrailer(false);
+    setLoadTrailer(false);
+    setPlayTrailer(false);
   };
   // Once the page is idle, so the first trailer isn't the one to load Shaka.
   React.useEffect(() => {
@@ -342,7 +380,8 @@ export function OpenCard({ href, item }: { href: string; item: BaseItemDto }) {
         const el = slide();
         if (el) reshape(el, true);
       }, OPEN_DELAY_MS),
-      setTimeout(() => setTrailer(true), OPEN_DELAY_MS + TRAILER_DELAY_MS),
+      setTimeout(() => setLoadTrailer(true), TRAILER_LOAD_MS),
+      setTimeout(() => setPlayTrailer(true), OPEN_DELAY_MS + TRAILER_DELAY_MS),
     ];
   };
   const title = itemTitle(item);
@@ -377,7 +416,7 @@ export function OpenCard({ href, item }: { href: string; item: BaseItemDto }) {
                 }
                 alt={title}
               />
-              {trailer && <OpenTrailer item={item} />}
+              {loadTrailer && <OpenTrailer item={item} play={playTrailer} />}
               <OpenTitle item={item} />
             </div>
           )}

@@ -114,12 +114,19 @@ function answerForTv(): void {
 /**
  * Plays the manifest at `url` in `video`, Shaka fetched only then. It starts
  * on the largest size the connection is assumed to carry, as a trailer ends
- * before a cautious start climbs. Resolves to its teardown.
+ * before a cautious start climbs. Returns its teardown. `startSeconds` is how
+ * much it buffers before it plays, and again after a stall; `bufferSeconds`
+ * how far ahead it keeps buffered (a long fill is a long burst of fetching and
+ * appending on the page's thread).
  */
 export function playDash(
   video: HTMLVideoElement,
   url: string,
-  onError: (message: string) => void
+  onError: (message: string) => void,
+  {
+    startSeconds = 2,
+    bufferSeconds = 30,
+  }: { startSeconds?: number; bufferSeconds?: number } = {}
 ): () => void {
   // After the teardown, nothing of this player is heard: the video may be
   // another file's by then.
@@ -165,7 +172,10 @@ export function playDash(
     if (gone) return;
     player.configure({
       abr: { defaultBandwidthEstimate: 20_000_000 },
-      streaming: { bufferingGoal: 30, rebufferingGoal: 2 },
+      streaming: {
+        bufferingGoal: bufferSeconds,
+        rebufferingGoal: startSeconds,
+      },
     });
     // Only what stops it: Shaka retries the rest itself.
     player.addEventListener('error', (event) => {

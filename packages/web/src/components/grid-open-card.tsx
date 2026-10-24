@@ -12,6 +12,7 @@ import {
   OpenTrailer,
   READY_MS,
   TRAILER_DELAY_MS,
+  TRAILER_LOAD_MS,
 } from './open-card';
 
 /**
@@ -76,7 +77,8 @@ export function GridOpenCard({
   const { client } = useSession();
   const [trailers] = useSetting(settings.interface.discoverTrailers);
   const [ready, setReady] = React.useState(false);
-  const [trailer, setTrailer] = React.useState(false);
+  const [loadTrailer, setLoadTrailer] = React.useState(false);
+  const [playTrailer, setPlayTrailer] = React.useState(false);
   const cell = React.useRef<HTMLDivElement>(null);
   const overlay = React.useRef<HTMLDivElement>(null);
   const timers = React.useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -126,7 +128,13 @@ export function GridOpenCard({
       setTimeout(() => setReady(true), READY_MS),
       setTimeout(open, OPEN_DELAY_MS),
       ...(trailers
-        ? [setTimeout(() => setTrailer(true), OPEN_DELAY_MS + TRAILER_DELAY_MS)]
+        ? [
+            setTimeout(() => setLoadTrailer(true), TRAILER_LOAD_MS),
+            setTimeout(
+              () => setPlayTrailer(true),
+              OPEN_DELAY_MS + TRAILER_DELAY_MS
+            ),
+          ]
         : []),
     ];
   };
@@ -135,7 +143,8 @@ export function GridOpenCard({
     stop();
     shut();
     setReady(false);
-    setTrailer(false);
+    setLoadTrailer(false);
+    setPlayTrailer(false);
   };
   const title = itemTitle(item);
   return (
@@ -160,7 +169,7 @@ export function GridOpenCard({
               src={(width) => landscapeUrls(client, item, { maxWidth: width })}
               alt={title}
             />
-            {trailer && <OpenTrailer item={item} />}
+            {loadTrailer && <OpenTrailer item={item} play={playTrailer} />}
             <OpenTitle item={item} />
           </div>
           <div className="-mt-2 rounded-b-lg bg-gray-950/95 px-3 pb-3 pt-4 shadow-2xl">
