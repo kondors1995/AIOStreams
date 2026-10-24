@@ -220,6 +220,9 @@ export function SettingsPage({
         onValueChange={onTabChange}
         activationMode="manual"
         marked={focused ?? undefined}
+        // A TV's marker is the static active style: sliding it between tabs
+        // measures the page's layout each time focus moves (250-360 ms).
+        animated={!currentHost().tv}
         variant="pill"
         className="grid w-full grid-cols-1 gap-6 lg:grid-cols-[240px,1fr]"
         triggerClass={cn(
