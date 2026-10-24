@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { barsIn } from './src/lib/playback/bars.ts';
+import { barsIn, combineBars } from './src/lib/playback/bars.ts';
 
 const W = 96;
 const H = 54;
+const near = (a: number, b: number) => Math.abs(a - b) < 1e-9;
 
 /** An RGBA frame whose rows `bar` from each edge are black and the rest `rest`. */
 function frame(
@@ -80,4 +81,20 @@ test('near-black noise still counts as bar', () => {
     ),
     6 / H
   );
+});
+
+test('the middle frame decides, so one odd frame is outvoted', () => {
+  // Crystal Lake's frames: 22, 22 and 4 rows of 180 (a bright graphic in the bar).
+  assert.ok(near(combineBars([22 / 180, 22 / 180, 4 / 180]), 22 / 180 + 0.005));
+  assert.ok(
+    near(combineBars([22 / 180, 40 / 180, 22 / 180]), 22 / 180 + 0.005)
+  );
+});
+
+test('two frames take the smaller, one is trusted, none is none, and there is a cap', () => {
+  assert.ok(near(combineBars([0.12, 0.02]), 0.025));
+  assert.ok(near(combineBars([0.1]), 0.105));
+  assert.equal(combineBars([0, 0, 0]), 0);
+  assert.equal(combineBars([]), 0);
+  assert.equal(combineBars([0.45, 0.45, 0.45]), 0.3);
 });
