@@ -116,9 +116,11 @@ jobs:
           echo "count=$(git rev-list --count HEAD.."$target")" >>"$GITHUB_OUTPUT"
           git merge --no-ff --no-commit "$target"
 
-          # Upstream's workflows are not this fork's: drop them, whatever the merge did with them.
-          { git ls-files .github/workflows | grep -vE '/(tizen-release|upstream-sync|upstream-watch)\.yml$' || true; } \
-            | xargs -r git rm -qf
+          # Upstream's workflows are not this fork's: drop each one this fork didn't have (HEAD is
+          # still the branch before the merge), whatever the merge did with it. The fork's own stay.
+          for f in $(git ls-files .github/workflows | sort -u); do
+            git cat-file -e "HEAD:$f" 2>/dev/null || git rm -qf -- "$f"
+          done
 
           # Conflicts with a known resolution: the lockfile is regenerated below, the catalogs by the checks.
           for f in $(git diff --name-only --diff-filter=U); do
@@ -147,6 +149,7 @@ jobs:
           git add -A
           git commit -q -m "Merge upstream $TAG (${target::8}) into $BRANCH" \
             -m "Settled by the sync workflow: upstream's own workflows dropped, pnpm-lock.yaml regenerated, translation catalogs left for the checks."
+          echo "merge=$(git rev-parse HEAD)" >>"$GITHUB_OUTPUT"
 
       - name: Chromium 69 (cached)
         if: steps.merge.outputs.uptodate != 'true'
@@ -218,6 +221,7 @@ jobs:
         if: steps.merge.outputs.uptodate != 'true'
         env:
           TARGET: ${{ steps.merge.outputs.target }}
+          MERGE: ${{ steps.merge.outputs.merge }}
           COUNT: ${{ steps.merge.outputs.count }}
           STATUS: ${{ steps.verify.outputs.status }}
           ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
@@ -253,7 +257,7 @@ jobs:
             echo "## What came in with $TAG"
             echo
             echo '```'
-            git diff --stat "HEAD~1" HEAD -- packages/web packages/ui packages/smart-tv packages/core/src/jellyfin | tail -25
+            git diff --stat "$MERGE^1" "$MERGE" -- packages/web packages/ui packages/smart-tv packages/core/src/jellyfin | tail -25
             echo '```'
           } >pr.md
           title="Sync upstream smart-tv $version"

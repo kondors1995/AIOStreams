@@ -163,7 +163,7 @@ export function OpenDetails({ item }: { item: BaseItemDto }) {
   // Also asks for its trailer's address now, so loading it later skips that.
   const prefetch = usePrefetchTrailer();
   const first = details.data ? trailersOf(details.data)[0]?.url : undefined;
-  React.useEffect(() => prefetch(first), [first]); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => prefetch(first), [first, prefetch]);
   return (
     <div
       data-ui="open-card-details"
@@ -294,9 +294,14 @@ export function OpenTrailer({
         startSeconds: TRAILER_START_SECONDS,
         bufferSeconds: TRAILER_BUFFER_SECONDS,
       });
-    else el.src = url;
+    else {
+      // Loaded whole: with a play that waits, the default would stop at the metadata.
+      el.preload = 'auto';
+      el.src = url;
+    }
     return () => {
       gone = true;
+      startNow.current = () => {};
       stop();
       el.removeEventListener('playing', onPlaying);
       el.removeEventListener('ended', onEnded);
