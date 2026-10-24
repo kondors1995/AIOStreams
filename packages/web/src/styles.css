@@ -136,6 +136,8 @@ body::-webkit-scrollbar {
    data-focus="own". Chained :not()s, since older TV browsers take no list. */
 html.dark {
   --ring: rgb(var(--color-brand-400));
+  /* A card's ring a little softer than the page's other focus marks. */
+  --card-ring: rgb(var(--color-brand-400) / 0.85);
 }
 :focus-visible:not([data-focus='own']):not(input):not(textarea) {
   --tw-ring-color: transparent;
@@ -199,21 +201,23 @@ html.no-focus-visible:not([data-pointer-focus])
   [role='option']:focus:not([data-focus='own']) {
   box-shadow: inset 0 0 0 2px var(--ring) !important;
 }
-/* A card's ring, rounded too: the gap the outline offset leaves, then the ring, both as shadows. */
+/* A card's ring, rounded too: the gap the outline offset leaves, then the ring, both as shadows.
+   It fades in (the transition is on the focused state only, so it goes at once as focus moves on). */
 html.no-focus-visible:not([data-pointer-focus])
   [data-focus='own']:focus
   [data-focus-frame] {
   outline: none !important;
+  transition: box-shadow 200ms ease-out;
   box-shadow:
     0 0 0 2px var(--background, #070707),
-    0 0 0 4px var(--ring) !important;
+    0 0 0 4px var(--card-ring, var(--ring)) !important;
 }
 html.no-focus-visible[data-tv]:not([data-pointer-focus])
   [data-focus='own']:focus
   [data-focus-frame] {
   box-shadow:
     0 0 0 2px var(--background, #070707),
-    0 0 0 5px var(--ring) !important;
+    0 0 0 5px var(--card-ring, var(--ring)) !important;
 }
 html.no-focus-visible #root:focus,
 html.no-focus-visible:not([data-pointer-focus])
