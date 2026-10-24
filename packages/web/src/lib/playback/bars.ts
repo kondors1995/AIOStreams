@@ -5,8 +5,11 @@
  * YouTube keeps as pictures, which allow it, instead.
  */
 
-const WIDTH = 96;
-const HEIGHT = 54;
+/* The frames are 320x180: read at their own height, so a bar's edge isn't rounded away. */
+const WIDTH = 64;
+const HEIGHT = 180;
+/** Cropped past what was seen, so JPEG ringing at a bar's edge leaves no thin line. */
+const MARGIN = 0.005;
 /** Brightest channel a bar's pixel may have. */
 const LEVEL = 24;
 /** Never more than this, whatever the frames say. */
@@ -64,7 +67,23 @@ function barOf(
   }
 }
 
-/** The share of the height each bar takes, 0 to 0.3: the smallest the frames show, 0 where none can be read. */
+/**
+ * One bar share from the frames' own: the middle one, so a frame with a
+ * bright title or subtitle in the bar (smaller) or a dark scene at its edges
+ * (larger) is outvoted by the others. With two frames the smaller, to err
+ * towards showing the picture whole; none, none; never more than `MOST`.
+ */
+export function combineBars(bars: number[]): number {
+  if (!bars.length) return 0;
+  const sorted = [...bars].sort((a, b) => a - b);
+  const middle =
+    sorted.length === 2
+      ? sorted[0]
+      : sorted[Math.floor((sorted.length - 1) / 2)];
+  return middle > 0 ? Math.min(middle + MARGIN, MOST) : 0;
+}
+
+/** The share of the height each bar takes, 0 to 0.3, from YouTube's frames of the trailer; 0 where none can be read. */
 export async function blackBars(videoId: string): Promise<number> {
   const canvas = document.createElement('canvas');
   canvas.width = WIDTH;
@@ -86,5 +105,5 @@ export async function blackBars(videoId: string): Promise<number> {
     const bar = barOf(context, image);
     if (bar !== null) bars.push(bar);
   }
-  return bars.length ? Math.min(Math.min(...bars), MOST) : 0;
+  return combineBars(bars);
 }
