@@ -66,7 +66,7 @@ export const RadioGroupAnatomy = defineStyleAnatomy({
     'UI-RadioGroup__itemContainer',
     'flex gap-2 items-center relative',
   ]),
-  itemCheckIcon: cva(['UI-RadioGroup__itemCheckIcon', 'text-white'], {
+  itemCheckIcon: cva(['UI-RadioGroup__itemCheckIcon', 'text-on-brand'], {
     variants: {
       size: {
         sm: 'h-4 w-4',

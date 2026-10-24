@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { t } from '@lingui/core/macro';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { currentHost } from '../hosts';
@@ -63,7 +64,10 @@ export const useTrailerPlayback = (url: string | undefined) =>
 
 export function usePrefetchTrailer() {
   const queryClient = useQueryClient();
-  return (url: string | undefined) => {
-    if (url) void queryClient.prefetchQuery(trailerQuery(url));
-  };
+  return useCallback(
+    (url: string | undefined) => {
+      if (url) void queryClient.prefetchQuery(trailerQuery(url));
+    },
+    [queryClient]
+  );
 }

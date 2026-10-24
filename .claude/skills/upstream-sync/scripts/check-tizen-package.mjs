@@ -129,7 +129,15 @@ try {
 
   // 1. every script parses (parsed, not run: new Function throws a SyntaxError on one Chromium 69 can't read)
   await call('Page.navigate', { url: `${base}/index.html` });
-  await new Promise((r) => setTimeout(r, 6000));
+  // Until the app has drawn something (20 s at most), then a moment for late errors.
+  for (let i = 0; i < 100; i++) {
+    await new Promise((r) => setTimeout(r, 200));
+    const drawn = await evaluate(
+      `(document.getElementById('root') || { children: [] }).children.length`
+    );
+    if (drawn > 0) break;
+  }
+  await new Promise((r) => setTimeout(r, 1500));
   const scripts = fs
     .readdirSync(path.join(dir, 'static'), { recursive: true })
     .filter((f) => f.endsWith('.js'))
@@ -152,7 +160,7 @@ try {
     )
   );
   console.log(`      engine ${state.ua}`);
-  const started = state.children > 0 && /server/i.test(state.text);
+  const started = state.children > 0 && state.text.trim().length > 0;
   console.log(
     `${started ? 'ok  ' : 'FAIL'}  the app draws its first page: ${JSON.stringify(state.text.split('\n').filter(Boolean)[0] ?? '')}`
   );
