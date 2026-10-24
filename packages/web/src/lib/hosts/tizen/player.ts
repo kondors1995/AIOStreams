@@ -78,6 +78,8 @@ export const avPlayEngine: EngineFactory = (emit) => {
   // No other call may reach AVPlay until a seek reports back.
   let seeking = false;
   let nextSeek: number | null = null;
+  // An audio pick AVPlay refused before it played, applied on the first tick that plays.
+  let pendingAudio: string | null = null;
   let queued: (() => void)[] = [];
   let teardown = () => {};
   const run = (fn: () => void) => {
@@ -155,6 +157,7 @@ export const avPlayEngine: EngineFactory = (emit) => {
       embeddedCue = null;
       seeking = false;
       nextSeek = null;
+      pendingAudio = null;
       queued = [];
       report({
         volume: (audioControl?.getVolume() ?? 100) / 100,
@@ -233,6 +236,12 @@ export const avPlayEngine: EngineFactory = (emit) => {
         if (seeking) return;
         const playing = av.getState();
         if (playing !== 'PLAYING' && playing !== 'PAUSED') return;
+        if (pendingAudio !== null) {
+          try {
+            av.setSelectTrack('AUDIO', Number(pendingAudio));
+            pendingAudio = null;
+          } catch {}
+        }
         position = av.getCurrentTime();
         emit({ type: 'position', positionMs: position });
         report({ started: true, paused: playing === 'PAUSED' });
@@ -280,7 +289,16 @@ export const avPlayEngine: EngineFactory = (emit) => {
       audioControl?.setVolume(Math.round(volume * 100));
       audioControl?.setMute(muted);
     },
-    setAudio: (id) => run(() => av.setSelectTrack('AUDIO', Number(id))),
+    // Throwing here, from the loaded event, would abort onPrepared before play().
+    setAudio: (id) =>
+      run(() => {
+        try {
+          av.setSelectTrack('AUDIO', Number(id));
+          pendingAudio = null;
+        } catch {
+          pendingAudio = id;
+        }
+      }),
     setSubtitle,
     setSubtitleDelay(ms) {
       delayMs = ms;
