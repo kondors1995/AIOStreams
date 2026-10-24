@@ -17,12 +17,12 @@ run "core build (web's types come from it)" pnpm -F @aiostreams/core build
 run "web typecheck" pnpm -F @aiostreams/web typecheck
 run "web lint (includes lingui/no-unlocalized-strings)" pnpm -F @aiostreams/web lint
 run "web tests: CSS fallbacks, black-bar detection, Chromium 69 static ratchets" pnpm -F @aiostreams/web test
-run "translation catalogs" bash -c '
+run "translation catalogs" bash -ec '
   pnpm -F @aiostreams/web i18n:extract >/dev/null
   git checkout -- packages/web/src/locales/de.po packages/web/src/locales/it.po packages/web/src/locales/pl.po 2>/dev/null || true
   git status --short packages/web/src/locales | sed "s/^/  changed (commit it): /"
   echo "  catalogs regenerated; Weblate-owned languages left as committed"'
-run "build the Tizen package only (web standalone, then the .wgt)" bash -c '
+run "build the Tizen package only (web standalone, then the .wgt)" bash -ec '
   pnpm -F @aiostreams/web build:standalone
   TIZEN_PROFILE="${TIZEN_PROFILE-aiostreams-tv}" node packages/smart-tv/scripts/build.mjs tizen'
 run "boot the package in Chromium 69: scripts parse, app starts, boot classes set" node "$scripts/check-tizen-package.mjs"
