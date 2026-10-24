@@ -14,7 +14,7 @@ import {
   playDash,
   preloadShaka,
 } from '../lib/playback/dash';
-import { blackBars } from '../lib/playback/bars';
+import { trailerZoom } from '../lib/playback/bars';
 import {
   trailersOf,
   usePrefetchTrailer,
@@ -236,9 +236,10 @@ export function OpenTrailer({
   const wanted = React.useRef(play);
   wanted.current = play;
   const [shown, setShown] = React.useState(false);
-  // How much larger than the card the picture is drawn, to crop the black bars
-  // a trailer carries in its own frames (a widescreen film in 16:9).
-  const [zoom, setZoom] = React.useState(1);
+  // How much larger than the card the video is drawn, `contain`-fitted as
+  // YouTube's own frames are, to crop the black bars it carries (a widescreen
+  // film, a 4:3 show). Unknown, it is `cover`ed at the card's size.
+  const [zoom, setZoom] = React.useState<number | null>(null);
   // Plays what is loaded, the moment `play` turns true.
   const startNow = React.useRef(() => {});
   React.useEffect(() => {
@@ -246,12 +247,12 @@ export function OpenTrailer({
   }, [play]);
   const trailerUrl = trailer?.url;
   React.useEffect(() => {
-    setZoom(1);
+    setZoom(null);
     const id = trailerUrl ? youTubeId(trailerUrl) : null;
     if (!id) return;
     let gone = false;
-    void blackBars(id).then((bar) => {
-      if (!gone) setZoom(1 / (1 - 2 * bar));
+    void trailerZoom(id).then((found) => {
+      if (!gone) setZoom(found);
     });
     return () => {
       gone = true;
@@ -313,13 +314,16 @@ export function OpenTrailer({
       playsInline
       // Larger than the card and centred, its overflow clipped by the frame.
       style={{
-        width: `${zoom * 100}%`,
-        height: `${zoom * 100}%`,
-        left: `${(1 - zoom) * 50}%`,
-        top: `${(1 - zoom) * 50}%`,
+        width: `${(zoom ?? 1) * 100}%`,
+        height: `${(zoom ?? 1) * 100}%`,
+        left: `${(1 - (zoom ?? 1)) * 50}%`,
+        top: `${(1 - (zoom ?? 1)) * 50}%`,
       }}
       className={cn(
-        'pointer-events-none absolute object-cover transition-opacity duration-500',
+        // max-w-none: the base styles cap a video at its container's width, which would leave a
+        // zoomed one's far edge uncovered.
+        'pointer-events-none absolute max-w-none transition-opacity duration-500',
+        zoom === null ? 'object-cover' : 'object-contain',
         shown ? 'opacity-100' : 'opacity-0'
       )}
     />

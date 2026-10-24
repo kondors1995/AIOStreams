@@ -1,12 +1,14 @@
 /**
- * How much of a YouTube trailer's height is black bar, top and bottom, that
- * its own frames carry (a widescreen film in a 16:9 upload). A Samsung TV
- * draws its video on a plane the page can't read, so this looks at frames
- * YouTube keeps as pictures, which allow it, instead.
+ * How far a YouTube trailer's picture must be enlarged to fill a 16:9 card, from
+ * the black bars its own frames carry: a letterbox (a widescreen film in a 16:9
+ * upload), a pillarbox (a 4:3 show), or both (a 16:9 picture letterboxed in a 4:3
+ * video, then pillarboxed in 16:9 as YouTube shows it). A Samsung TV draws its
+ * video on a plane the page can't read, so this looks at frames YouTube keeps
+ * as pictures, which allow it, instead.
  */
 
-/* The frames are 320x180: read at their own height, so a bar's edge isn't rounded away. */
-const WIDTH = 64;
+/* The frames are 320x180: read as they are, so a bar's edge isn't rounded away. */
+const WIDTH = 320;
 const HEIGHT = 180;
 /** Cropped past what was seen, so JPEG ringing at a bar's edge leaves no thin line. */
 const MARGIN = 0.005;
@@ -26,38 +28,66 @@ const load = (src: string) =>
     image.src = src;
   });
 
+/** The share of a frame's height the rows of black at its top and bottom take, and of its width the columns at its sides. */
+export interface Edges {
+  rows: number;
+  cols: number;
+}
+
 /**
- * How much of a frame's height each bar takes, from its RGBA pixels at
- * `width` x `height`: the thinner of the black rows at its top and bottom.
- * Null for an all-dark frame (a fade, a black frame), which says nothing of bars.
+ * The bars of a frame, from its RGBA pixels at `width` x `height`: for each
+ * axis the thinner of its two. Null for an all-dark frame (a fade, a black
+ * frame), which says nothing of bars.
  */
-export function barsIn(
+export function edgesIn(
   data: ArrayLike<number>,
   width: number,
   height: number
-): number | null {
-  const dark = (y: number) => {
-    for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4;
-      if (Math.max(data[i], data[i + 1], data[i + 2]) > LEVEL) return false;
-    }
+): Edges | null {
+  const dark = (x: number, y: number) =>
+    Math.max(
+      data[(y * width + x) * 4],
+      data[(y * width + x) * 4 + 1],
+      data[(y * width + x) * 4 + 2]
+    ) <= LEVEL;
+  const darkRow = (y: number) => {
+    for (let x = 0; x < width; x++) if (!dark(x, y)) return false;
+    return true;
+  };
+  const darkCol = (x: number) => {
+    for (let y = 0; y < height; y++) if (!dark(x, y)) return false;
     return true;
   };
   let top = 0;
-  while (top < height / 2 && dark(top)) top++;
+  while (top < height / 2 && darkRow(top)) top++;
+  if (top >= height / 2) return null;
   let bottom = 0;
-  while (bottom < height / 2 && dark(height - 1 - bottom)) bottom++;
-  return top < height / 2 ? Math.min(top, bottom) / height : null;
+  while (bottom < height / 2 && darkRow(height - 1 - bottom)) bottom++;
+  let left = 0;
+  while (left < width / 2 && darkCol(left)) left++;
+  let right = 0;
+  while (right < width / 2 && darkCol(width - 1 - right)) right++;
+  return {
+    rows: Math.min(top, bottom) / height,
+    cols: Math.min(left, right) / width,
+  };
 }
 
-/** One frame's bars; null for a frame that can't be read or is all dark. */
-function barOf(
+/** The letterbox alone: `edgesIn`'s rows. */
+export const barsIn = (
+  data: ArrayLike<number>,
+  width: number,
+  height: number
+) => edgesIn(data, width, height)?.rows ?? null;
+
+/** One frame's edges; null for a frame that can't be read or is all dark. */
+function edgesOf(
   context: CanvasRenderingContext2D,
   image: HTMLImageElement
-): number | null {
+): Edges | null {
   try {
     context.drawImage(image, 0, 0, WIDTH, HEIGHT);
-    return barsIn(
+    return edgesIn(
       context.getImageData(0, 0, WIDTH, HEIGHT).data,
       WIDTH,
       HEIGHT
@@ -83,13 +113,22 @@ export function combineBars(bars: number[]): number {
   return middle > 0 ? Math.min(middle + MARGIN, MOST) : 0;
 }
 
-/** The share of the height each bar takes, 0 to 0.3, from YouTube's frames of the trailer; 0 where none can be read. */
-export async function blackBars(videoId: string): Promise<number> {
+/**
+ * How much larger than the card the video is drawn, `contain`-fitted as YouTube
+ * draws its frames, for the picture inside the bars to fill it: the larger of
+ * what the rows and the columns need, so a 4:3 show comes out as if covered.
+ */
+export function zoomFor(rows: number, cols: number): number {
+  return 1 / (1 - 2 * Math.max(rows, cols));
+}
+
+/** The zoom for a YouTube trailer, from three of its frames; null where none can be read. */
+export async function trailerZoom(videoId: string): Promise<number | null> {
   const canvas = document.createElement('canvas');
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
   const context = canvas.getContext('2d');
-  if (!context) return 0;
+  if (!context) return null;
   // Fetched together; the canvas is read one frame at a time, as each arrives.
   const frames = await Promise.all(
     FRAMES.map((frame) =>
@@ -99,11 +138,14 @@ export async function blackBars(videoId: string): Promise<number> {
       )
     )
   );
-  const bars: number[] = [];
+  const edges: Edges[] = [];
   for (const image of frames) {
-    if (!image) continue;
-    const bar = barOf(context, image);
-    if (bar !== null) bars.push(bar);
+    const found = image && edgesOf(context, image);
+    if (found) edges.push(found);
   }
-  return combineBars(bars);
+  if (!edges.length) return null;
+  return zoomFor(
+    combineBars(edges.map((e) => e.rows)),
+    combineBars(edges.map((e) => e.cols))
+  );
 }
