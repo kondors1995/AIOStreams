@@ -1,7 +1,7 @@
 import { t } from '@lingui/core/macro';
 import { adaptiveInfo } from './youtube';
 import { parseCues, type SubtitleCue } from '../../subtitles/cues';
-import { ofType, ownTrackLabel, trackLabel } from '../../playback/controller';
+import { ofType, ownTrackLabel } from '../../playback/controller';
 import type {
   EngineFactory,
   EngineFile,
@@ -25,41 +25,52 @@ const TICK_MS = 250;
 /** Samsung's TVs since 2018 can't decode it. */
 const DTS = /dts/i;
 const TAGS = /<[^>]*>|\{[^}]*\}/g;
+/** AVPlay lists no more subtitles than this. */
+const MAX_TEXT_TRACKS = 30;
 
 function tracksOf(
   av: AvPlay,
   type: 'AUDIO' | 'TEXT',
   source: SourceInfo
 ): AvTrack[] {
-  const streams = ofType(source, type === 'AUDIO' ? 'Audio' : 'Subtitle');
-  return av
-    .getTotalTrackInfo()
-    .filter((t) => t.type === type)
-    .map((t, i) => {
-      let info: Record<string, string> = {};
-      try {
-        info = JSON.parse(t.extra_info) ?? {};
-      } catch {}
-      const codec = info.fourCC;
-      // AVPlay numbers tracks as the server does, and its own languages are
-      // poor: a subtitle's is cut to two letters, and Finnish comes as `fr`.
-      const stream = streams.find((s) => s.Index === t.index && s.Language);
-      const language =
-        stream?.Language ?? (info.language ?? info.track_lang)?.trim();
-      return {
-        index: t.index,
+  const listed = av.getTotalTrackInfo().filter((t) => t.type === type);
+  const inFile = ofType(source, type === 'AUDIO' ? 'Audio' : 'Subtitle').filter(
+    (s) => s.DeliveryMethod !== 'External'
+  );
+  // Both list a file's tracks in order, so a place is the same track; where
+  // the lists differ it may not be. The server's numbers aren't the file's.
+  const same =
+    inFile.length === listed.length ||
+    (type === 'TEXT' &&
+      listed.length === MAX_TEXT_TRACKS &&
+      inFile.length > MAX_TEXT_TRACKS);
+  return listed.map((t, i) => {
+    let info: Record<string, string> = {};
+    try {
+      info = JSON.parse(t.extra_info) ?? {};
+    } catch {}
+    const stream = same ? inFile[i] : undefined;
+    const own = [info.language, info.track_lang]
+      .find((l) => typeof l === 'string' && l.trim())
+      ?.trim();
+    // A subtitle's own is cut to two letters and can be wrong (Finnish comes as
+    // `fr`); audio's holds, where the server's can be a guess from the name.
+    const language =
+      (type === 'AUDIO' ? own || stream?.Language : stream?.Language || own) ??
+      undefined;
+    const codec = info.fourCC;
+    return {
+      index: t.index,
+      language,
+      codec,
+      stream,
+      label: ownTrackLabel(
+        stream?.Title ?? (type === 'AUDIO' ? codec : undefined),
         language,
-        codec,
-        stream,
-        label: stream
-          ? trackLabel(stream, i + 1)
-          : ownTrackLabel(
-              type === 'AUDIO' ? codec : undefined,
-              language,
-              i + 1
-            ),
-      };
-    });
+        i + 1
+      ),
+    };
+  });
 }
 
 function errorMessage(error: unknown): string {
@@ -202,7 +213,6 @@ export const avPlayEngine: EngineFactory = (emit) => {
             label: t.label,
             lang: t.language,
             title: t.stream?.Title ?? undefined,
-            default: t.stream?.IsDefault,
             unplayable: DTS.test(t.codec ?? ''),
           })),
           ...text.map((t) => ({
@@ -265,12 +275,12 @@ export const avPlayEngine: EngineFactory = (emit) => {
         if (seeking) return;
         const playing = av.getState();
         if (playing !== 'PLAYING' && playing !== 'PAUSED') return;
-        waiting.forEach((fn) => {
+        waiting.forEach((fn, kind) => {
           try {
             fn();
+            waiting.delete(kind);
           } catch {}
         });
-        waiting.clear();
         position = av.getCurrentTime();
         emit({ type: 'position', positionMs: position });
         report({ started: true, paused: playing === 'PAUSED' });
