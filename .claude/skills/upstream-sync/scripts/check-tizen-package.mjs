@@ -171,6 +171,7 @@ try {
     'no-flex-gap',
     'no-logical-props',
     'no-min-max',
+    'no-dvh',
   ];
   const missing = want.filter((c) => !state.classes.split(' ').includes(c));
   console.log(

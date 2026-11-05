@@ -73,13 +73,14 @@ jobs:
       UPSTREAM: ${{ inputs.upstream }}
       BASE: ${{ inputs.base }}
       BRANCH: ${{ inputs.branch }}
-      GH_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.base }}
           fetch-depth: 0
-          token: ${{ secrets.SYNC_TOKEN || github.token }}
+          # The steps below run upstream's code, so the token reaches only the last one.
+          # shortcut: that step shares this job's runner, a separate job would isolate it fully.
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
@@ -220,6 +221,7 @@ jobs:
       - name: Push the branch and open or update the pull request
         if: steps.merge.outputs.uptodate != 'true'
         env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
           TARGET: ${{ steps.merge.outputs.target }}
           MERGE: ${{ steps.merge.outputs.merge }}
           COUNT: ${{ steps.merge.outputs.count }}
@@ -229,7 +231,9 @@ jobs:
         run: |
           set -eu
           version="${TAG##*-v}"
-          git push origin "$BRANCH"
+          git remote set-url origin "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git"
+          # Hooks could have been planted by the code the checks ran.
+          git -c core.hooksPath=/dev/null push origin "$BRANCH"
           {
             echo "Merges upstream \`$TAG\` ([\`${TARGET::8}\`](https://github.com/$UPSTREAM/commit/$TARGET), $COUNT commits) into \`$BASE\`, on \`$BRANCH\`."
             echo
