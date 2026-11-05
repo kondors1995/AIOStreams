@@ -228,23 +228,26 @@ export async function resolveYouTube(
   { dash: allowDash = false }: { dash?: boolean } = {}
 ): Promise<string | null> {
   if (!/^[\w-]{11}$/.test(videoId)) return null;
+  // Kept while another client may still have DASH.
+  let fallback: string | null = null;
   for (const client of CLIENTS) {
     try {
       const streaming = await ask(client, videoId);
       if (!streaming) continue;
       const dash = allowDash ? dashOf(streaming.adaptiveFormats ?? []) : null;
       if (dash) return dash;
-      const fallback =
+      const url =
         streaming.hlsManifestUrl ?? streaming.formats?.find((f) => f.url)?.url;
-      if (fallback) {
+      if (url) {
         tell(
           `${client.name}: no DASH, ${streaming.hlsManifestUrl ? 'HLS' : '360p'}`
         );
-        return fallback;
+        if (!allowDash) return url;
+        fallback ??= url;
       }
     } catch (e) {
       tell(`${client.name} ${(e as Error).message || String(e)}`);
     }
   }
-  return null;
+  return fallback;
 }
