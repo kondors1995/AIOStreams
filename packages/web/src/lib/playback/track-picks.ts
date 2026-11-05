@@ -108,10 +108,19 @@ export function chooseTracks(
   const audioInLanguages = languages.some((l) =>
     sameLanguage(l, playing?.lang)
   );
+  const onlyForced =
+    mode === 'OnlyForced' || (mode === 'Smart' && audioInLanguages);
+  const forcedFromServer = (lang: string | undefined) =>
+    bestOfTypes(
+      servers.filter(
+        (s) => sameLanguage(lang, s.lang) && forcedOnly(serverFacts(s))
+      ),
+      serverFacts,
+      prefs
+    )?.id ?? null;
   const chosen = subtitles.find((t) => t.id === subtitleId);
+  const server = servers.find((s) => s.id === subtitleId);
   if (chosen) {
-    const onlyForced =
-      mode === 'OnlyForced' || (mode === 'Smart' && audioInLanguages);
     const same = subtitles.filter(
       (t) =>
         t === chosen ||
@@ -126,7 +135,9 @@ export function chooseTracks(
     );
     if (best) subtitleId = best.id;
     // Our own pick, of a full subtitle where only forced ones should show.
-    else if (!picked) subtitleId = null;
+    else if (!picked) subtitleId = forcedFromServer(chosen.lang);
+  } else if (server && onlyForced && !picked) {
+    subtitleId = forcedFromServer(server.lang);
   }
 
   if (mode === 'Always' || (mode === 'Smart' && !audioInLanguages)) {
