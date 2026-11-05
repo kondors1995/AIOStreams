@@ -38,6 +38,8 @@
     html.className += ' no-logical-props';
   if (!(window.CSS && CSS.supports('width', 'min(1px, 2px)')))
     html.className += ' no-min-max';
+  if (!(window.CSS && CSS.supports('height', '1dvh')))
+    html.className += ' no-dvh';
 
   // Stand-ins for what Chromium 69 (2020 Samsung TVs) lacks, which the app
   // calls unguarded: lists join with commas, and names fall back to the code.

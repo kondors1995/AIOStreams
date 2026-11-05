@@ -152,3 +152,13 @@ test('falls back to the first size of min() and max()', async () => {
   assert.match(css, /\.tx\{--tw-translate-x:min\(14rem,25vw\)\}/);
   assert.match(css, /\.no-min-max \.tx\s*\{\s*--tw-translate-x:\s*14rem/);
 });
+
+test('stands in for dvh, in a custom property by a rule under a class', async () => {
+  const { css } = await postcss([legacyCss()]).process(
+    '.h{height:100dvh}.hero{--hero-h:calc(45dvh + 1px)}',
+    { from: undefined }
+  );
+  assert.match(css, /height:\s*100vh;\s*height:100dvh/);
+  assert.match(css, /\.hero\{--hero-h:calc\(45dvh \+ 1px\)\}/);
+  assert.match(css, /\.no-dvh \.hero\s*\{\s*--hero-h:\s*calc\(45vh \+ 1px\)/);
+});

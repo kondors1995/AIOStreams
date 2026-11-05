@@ -87,7 +87,15 @@ export function TrailerPage({
     );
   if (found.kind === 'embed')
     return <EmbeddedTrailer {...props} id={found.id} />;
-  return <PlayedTrailer {...props} url={found.url} prefs={prefs.prefs} />;
+  // Keyed as the player is chosen from the url once: DASH can't go to a TV's own.
+  return (
+    <PlayedTrailer
+      key={found.url}
+      {...props}
+      url={found.url}
+      prefs={prefs.prefs}
+    />
+  );
 }
 
 const sourceOf = (url: string): SourceInfo => ({

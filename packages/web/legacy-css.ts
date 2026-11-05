@@ -1,4 +1,4 @@
-import type { Plugin, Rule } from 'postcss';
+import type { Declaration, Plugin, Rule } from 'postcss';
 import selectorParser from 'postcss-selector-parser';
 
 /**
@@ -30,9 +30,8 @@ export function legacyCss(): Plugin {
         }
       });
       root.walkDecls((decl) => {
-        if (/\ddvh\b/.test(decl.value)) {
-          decl.cloneBefore({ value: decl.value.replace(/(\d)dvh\b/g, '$1vh') });
-        }
+        if (/\ddvh\b/.test(decl.value))
+          standIn(decl, decl.value.replace(/(\d)dvh\b/g, '$1vh'), 'no-dvh');
       });
       // Logical properties with no longhand to fall back on: Lightning CSS
       // writes them with `:lang()` selectors this engine drops as well.
@@ -59,21 +58,10 @@ export function legacyCss(): Plugin {
         }
       });
       // `min()` and `max()` (Chromium 79) as their first argument, the size a
-      // rule starts from; a custom property takes the last value, so its
-      // stand-in is a rule of its own.
+      // rule starts from.
       root.walkDecls((decl) => {
-        if (!MIN_MAX.test(decl.value)) return;
-        const value = firstArguments(decl.value);
-        const rule = decl.parent as Rule;
-        if (!decl.prop.startsWith('--'))
-          return void decl.cloneBefore({ value });
-        if (rule.type !== 'rule') return;
-        rule
-          .cloneAfter({
-            selectors: rule.selectors.map((s) => under('no-min-max', s)),
-          })
-          .removeAll()
-          .append({ prop: decl.prop, value, important: decl.important });
+        if (MIN_MAX.test(decl.value))
+          standIn(decl, firstArguments(decl.value), 'no-min-max');
       });
       root.walkDecls('aspect-ratio', (decl) => {
         const rule = decl.parent as Rule;
@@ -209,9 +197,20 @@ export function legacyCss(): Plugin {
  * `[data-tv]` and the dark theme's `.dark` do, or on another of these classes,
  * takes the class there.
  */
+/** `value` before `decl`; a custom property takes the last value, so its stand-in is a rule of its own. */
+function standIn(decl: Declaration, value: string, className: string) {
+  if (!decl.prop.startsWith('--')) return void decl.cloneBefore({ value });
+  const rule = decl.parent as Rule;
+  if (rule.type !== 'rule') return;
+  rule
+    .cloneAfter({ selectors: rule.selectors.map((s) => under(className, s)) })
+    .removeAll()
+    .append({ prop: decl.prop, value, important: decl.important });
+}
+
 function under(className: string, selector: string, extra = ''): string {
   const root =
-    /^(html(?![\w-])|\[data-tv\]|\.dark(?![\w-])|\.no-(?:focus-visible|flex-gap|aspect-ratio|logical-props|min-max)(?![\w-]))/.exec(
+    /^(html(?![\w-])|\[data-tv\]|\.dark(?![\w-])|\.no-(?:focus-visible|flex-gap|aspect-ratio|logical-props|min-max|dvh)(?![\w-]))/.exec(
       selector
     );
   if (root)

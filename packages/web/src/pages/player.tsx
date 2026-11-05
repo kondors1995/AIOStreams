@@ -341,7 +341,8 @@ function useFailover(
   versions: SourceInfo[],
   player: PlayerController,
   startMs: number,
-  off: boolean
+  off: boolean,
+  playlist?: string
 ) {
   const [on] = useSetting(settings.playback.failover);
   const play = usePlay();
@@ -389,6 +390,7 @@ function useFailover(
       source: to,
       startMs,
       replace: true,
+      playlist,
       current: () => current,
     });
     return () => {
@@ -766,7 +768,15 @@ function Player({
   });
   const player = usePartyPlayer(own, playlistItemId);
   close.current = player.close;
-  useFailover(item, source, versions, player, startMs, !!local || inParty);
+  useFailover(
+    item,
+    source,
+    versions,
+    player,
+    startMs,
+    !!local || inParty,
+    playlist
+  );
   const segments = useShownSegments(
     item,
     useSegments(item.Id!).data?.Items,

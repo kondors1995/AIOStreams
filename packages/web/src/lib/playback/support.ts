@@ -77,6 +77,7 @@ function judge(source: SourceInfo): string | null {
   const tags = source.aiostreams;
   const video = streams.find((s) => s.Type === 'Video');
   const range = video?.VideoRangeType;
+  // Every kind: those with an HDR10 layer failed on a Samsung TV too.
   const dolbyVision = range
     ? /^DOVI/i.test(range)
     : !!tags?.visualTags.some((t) => DV_TAGS.includes(t));
