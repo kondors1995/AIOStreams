@@ -107,8 +107,10 @@ function pushAside(
   };
   const moved: Animation[] = [];
   const unseen: HTMLElement[] = [];
+  // Read once: after the writes below it lays the page out, 300 ms on a TV in this loop.
+  const near = innerHeight + 300;
   for (const { el, rect } of tiles) {
-    const seen = rect.bottom > -100 && rect.top < innerHeight + 300;
+    const seen = rect.bottom > -100 && rect.top < near;
     if (rowOf(rect.top)) {
       const dx = rightward
         ? rect.left > here.left
