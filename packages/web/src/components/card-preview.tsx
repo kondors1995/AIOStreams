@@ -5,6 +5,7 @@ import { cn } from '@aiostreams/ui/core/styling';
 import { useSession } from '../lib/session';
 import { useItem } from '../lib/queries';
 import { currentHost } from '../lib/hosts';
+import { focusVisible } from '../lib/input/focus';
 import { backdropUrls, landscapeUrls, logoUrl } from '../lib/images';
 import {
   airedLabel,
@@ -52,7 +53,7 @@ export function useCardPreview(item: BaseItemDto) {
     },
     onPointerLeave: previews.leave,
     onFocus: (e: React.FocusEvent<HTMLElement>) => {
-      if ((e.target as Element).matches(':focus-visible'))
+      if (focusVisible(e.target as Element))
         previews.rest({ item, card: e.currentTarget, byFocus: true });
     },
     onBlur: previews.blur,

@@ -35,8 +35,10 @@
       "components/layout.tsx": 4,
       "components/overview.tsx": 2,
       "components/party/party-sheet.tsx": 3,
+      "components/player/scrub-strip.tsx": 2,
       "components/season-pills.tsx": 2,
-      "components/version-picker.tsx": 1
+      "components/version-picker.tsx": 1,
+      "pages/item.tsx": 2
     }
   }
 }
