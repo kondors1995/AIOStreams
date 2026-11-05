@@ -325,6 +325,8 @@ export function OpenTrailer({
   }, [url]);
   return (
     <video
+      // Its own for each trailer: Shaka lets go of the last one after this one starts.
+      key={url}
       ref={video}
       data-ui="open-card-trailer"
       playsInline
