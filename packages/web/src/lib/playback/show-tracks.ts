@@ -26,8 +26,13 @@ interface ShowPick {
   subtitle?: string;
 }
 
+/** What a pick is kept for: an episode's show, or a movie itself. */
 const showOf = (item: BaseItemDto) =>
-  item.Type === 'Episode' ? (item.SeriesId ?? undefined) : undefined;
+  item.Type === 'Episode'
+    ? (item.SeriesId ?? undefined)
+    : item.Type === 'Movie'
+      ? (item.Id ?? undefined)
+      : undefined;
 
 function pickOf(picks: Picks | undefined, showId: string): ShowPick {
   const [audio, subtitle] = (picks?.[showId] ?? '').split('|');

@@ -1,13 +1,14 @@
 import { t } from '@lingui/core/macro';
 import { adaptiveInfo } from './youtube';
 import { parseCues, type SubtitleCue } from '../../subtitles/cues';
-import { ownTrackLabel } from '../../playback/controller';
+import { ofType, ownTrackLabel, trackLabel } from '../../playback/controller';
 import type {
   EngineFactory,
   EngineFile,
   EngineState,
   EngineTrack,
 } from '../../playback/engine';
+import type { MediaStream, SourceInfo } from '../../types';
 import type { AvPlay } from '.';
 
 interface AvTrack {
@@ -15,6 +16,8 @@ interface AvTrack {
   language?: string;
   codec?: string;
   label: string;
+  /** The server's entry for it, where it names one. */
+  stream?: MediaStream;
 }
 
 const EMBEDDED = 'embedded:';
@@ -23,7 +26,12 @@ const TICK_MS = 250;
 const DTS = /dts/i;
 const TAGS = /<[^>]*>|\{[^}]*\}/g;
 
-function tracksOf(av: AvPlay, type: 'AUDIO' | 'TEXT'): AvTrack[] {
+function tracksOf(
+  av: AvPlay,
+  type: 'AUDIO' | 'TEXT',
+  source: SourceInfo
+): AvTrack[] {
+  const streams = ofType(source, type === 'AUDIO' ? 'Audio' : 'Subtitle');
   return av
     .getTotalTrackInfo()
     .filter((t) => t.type === type)
@@ -32,17 +40,24 @@ function tracksOf(av: AvPlay, type: 'AUDIO' | 'TEXT'): AvTrack[] {
       try {
         info = JSON.parse(t.extra_info) ?? {};
       } catch {}
-      const language = info.language ?? info.track_lang;
       const codec = info.fourCC;
+      // AVPlay numbers tracks as the server does, and its own languages are
+      // poor: a subtitle's is cut to two letters, and Finnish comes as `fr`.
+      const stream = streams.find((s) => s.Index === t.index && s.Language);
+      const language =
+        stream?.Language ?? (info.language ?? info.track_lang)?.trim();
       return {
         index: t.index,
         language,
         codec,
-        label: ownTrackLabel(
-          type === 'AUDIO' ? codec : undefined,
-          language,
-          i + 1
-        ),
+        stream,
+        label: stream
+          ? trackLabel(stream, i + 1)
+          : ownTrackLabel(
+              type === 'AUDIO' ? codec : undefined,
+              language,
+              i + 1
+            ),
       };
     });
 }
@@ -79,13 +94,23 @@ export const avPlayEngine: EngineFactory = (emit) => {
   let seeking = false;
   let nextSeek: number | null = null;
   // An audio pick AVPlay refused before it played, applied on the first tick that plays.
-  let pendingAudio: string | null = null;
+  // AVPlay refuses a track choice until it plays; the last of each kind waits.
+  const waiting = new Map<'AUDIO' | 'TEXT', () => void>();
   let queued: (() => void)[] = [];
   let teardown = () => {};
   const run = (fn: () => void) => {
     if (seeking) queued.push(fn);
     else fn();
   };
+  const choose = (kind: 'AUDIO' | 'TEXT', fn: () => void) =>
+    run(() => {
+      try {
+        fn();
+        waiting.delete(kind);
+      } catch {
+        waiting.set(kind, fn);
+      }
+    });
 
   const showText = () => {
     const at = position - delayMs;
@@ -127,12 +152,10 @@ export const avPlayEngine: EngineFactory = (emit) => {
     externalCues = [];
     embeddedCue = null;
     report({ subtitle: id });
-    run(() => {
-      try {
-        if (id?.startsWith(EMBEDDED))
-          av.setSelectTrack('TEXT', Number(id.slice(EMBEDDED.length)));
-        av.setSilentSubtitle(!id?.startsWith(EMBEDDED));
-      } catch {}
+    choose('TEXT', () => {
+      if (id?.startsWith(EMBEDDED))
+        av.setSelectTrack('TEXT', Number(id.slice(EMBEDDED.length)));
+      av.setSilentSubtitle(!id?.startsWith(EMBEDDED));
     });
     const server = file?.subtitles.find((s) => s.id === id);
     if (!server) return showText();
@@ -157,7 +180,7 @@ export const avPlayEngine: EngineFactory = (emit) => {
       embeddedCue = null;
       seeking = false;
       nextSeek = null;
-      pendingAudio = null;
+      waiting.clear();
       queued = [];
       report({
         volume: (audioControl?.getVolume() ?? 100) / 100,
@@ -171,14 +194,16 @@ export const avPlayEngine: EngineFactory = (emit) => {
 
       const adaptive = adaptiveInfo(next.url);
       const onPrepared = () => {
-        const audio = tracksOf(av, 'AUDIO');
-        const text = tracksOf(av, 'TEXT');
+        const audio = tracksOf(av, 'AUDIO', next.source);
+        const text = tracksOf(av, 'TEXT', next.source);
         const tracks: EngineTrack[] = [
           ...audio.map((t) => ({
             id: String(t.index),
             type: 'audio' as const,
             label: t.label,
             lang: t.language,
+            title: t.stream?.Title ?? undefined,
+            default: t.stream?.IsDefault,
             unplayable: DTS.test(t.codec ?? ''),
           })),
           ...text.map((t) => ({
@@ -186,6 +211,9 @@ export const avPlayEngine: EngineFactory = (emit) => {
             type: 'subtitle' as const,
             label: t.label,
             lang: t.language,
+            title: t.stream?.Title ?? undefined,
+            forced: t.stream?.IsForced,
+            hearingImpaired: t.stream?.IsHearingImpaired,
           })),
         ];
         emit({ type: 'tracks', tracks });
@@ -236,12 +264,12 @@ export const avPlayEngine: EngineFactory = (emit) => {
         if (seeking) return;
         const playing = av.getState();
         if (playing !== 'PLAYING' && playing !== 'PAUSED') return;
-        if (pendingAudio !== null) {
+        waiting.forEach((fn) => {
           try {
-            av.setSelectTrack('AUDIO', Number(pendingAudio));
-            pendingAudio = null;
+            fn();
           } catch {}
-        }
+        });
+        waiting.clear();
         position = av.getCurrentTime();
         emit({ type: 'position', positionMs: position });
         report({ started: true, paused: playing === 'PAUSED' });
@@ -291,14 +319,7 @@ export const avPlayEngine: EngineFactory = (emit) => {
     },
     // Throwing here, from the loaded event, would abort onPrepared before play().
     setAudio: (id) =>
-      run(() => {
-        try {
-          av.setSelectTrack('AUDIO', Number(id));
-          pendingAudio = null;
-        } catch {
-          pendingAudio = id;
-        }
-      }),
+      choose('AUDIO', () => av.setSelectTrack('AUDIO', Number(id))),
     setSubtitle,
     setSubtitleDelay(ms) {
       delayMs = ms;
