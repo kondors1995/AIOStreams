@@ -100,8 +100,7 @@ jobs:
           echo "target=$target" >>"$GITHUB_OUTPUT"
 
           # The branch: the existing one with the base brought in, else a new one from the base.
-          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-            git fetch origin "$BRANCH"
+          if git show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
             git switch -c "$BRANCH" "origin/$BRANCH"
             git merge --no-edit "origin/$BASE" \
               || { echo "### Could not bring $BASE into $BRANCH" >>"$GITHUB_STEP_SUMMARY"; git diff --name-only --diff-filter=U | sed 's/^/- /' >>"$GITHUB_STEP_SUMMARY"; git merge --abort; exit 1; }
