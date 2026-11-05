@@ -93,7 +93,6 @@ export const avPlayEngine: EngineFactory = (emit) => {
   // No other call may reach AVPlay until a seek reports back.
   let seeking = false;
   let nextSeek: number | null = null;
-  // An audio pick AVPlay refused before it played, applied on the first tick that plays.
   // AVPlay refuses a track choice until it plays; the last of each kind waits.
   const waiting = new Map<'AUDIO' | 'TEXT', () => void>();
   let queued: (() => void)[] = [];
@@ -241,6 +240,8 @@ export const avPlayEngine: EngineFactory = (emit) => {
           onerror: (type: string) =>
             emit({ type: 'failed', error: errorMessage(type) }),
           onsubtitlechange: (duration: number, text: string) => {
+            // AVPlay turns a file's first subtitle on by itself.
+            if (!subtitle?.startsWith(EMBEDDED)) return;
             const at = position;
             embeddedCue = text
               ? { startMs: at, endMs: at + Number(duration), text }

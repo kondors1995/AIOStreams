@@ -125,6 +125,8 @@ export function chooseTracks(
       prefs
     );
     if (best) subtitleId = best.id;
+    // Our own pick, of a full subtitle where only forced ones should show.
+    else if (!picked) subtitleId = null;
   }
 
   if (mode === 'Always' || (mode === 'Smart' && !audioInLanguages)) {
