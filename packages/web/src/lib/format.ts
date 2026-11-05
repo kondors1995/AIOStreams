@@ -217,9 +217,13 @@ const UNTIL = perLocale(
   (locale) => new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
 );
 
+/** As `toLocaleString` has it for a bad date, which `format` throws on. */
+const dated = (format: Intl.DateTimeFormat, date: Date) =>
+  Number.isNaN(date.getTime()) ? String(date) : format.format(date);
+
 /** `20 Jan 2008` */
 export function shortDate(iso: string): string {
-  return SHORT_DATE().format(airDay(iso));
+  return dated(SHORT_DATE(), airDay(iso));
 }
 
 /**
@@ -240,12 +244,12 @@ export function airDay(iso: string): Date {
 
 export function airTime(iso: string): string | null {
   if (dateOnly(iso)) return null;
-  return AIR_TIME().format(new Date(iso));
+  return dated(AIR_TIME(), new Date(iso));
 }
 
 /** `Sun, 28 Sep` */
 export function dayLabel(iso: string): string {
-  return DAY_LABEL().format(airDay(iso));
+  return dated(DAY_LABEL(), airDay(iso));
 }
 
 /** `today`, `tomorrow`, `in 6 days` or `in 3 weeks`, counted in calendar days. */
