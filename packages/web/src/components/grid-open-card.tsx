@@ -276,7 +276,7 @@ export function GridOpenCard({
             <OpenTitle item={item} />
           </div>
           <div className="-mt-2 rounded-b-lg bg-gray-950/95 px-3 pb-3 pt-4 shadow-2xl">
-            <OpenDetails item={item} />
+            <OpenDetails item={item} trailer={trailers} />
           </div>
         </div>
       )}

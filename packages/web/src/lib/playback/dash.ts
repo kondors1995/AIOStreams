@@ -93,6 +93,9 @@ export const preloadShaka = () => void import('shaka-player').catch(() => {});
  * load Samsung's product-info and AV-info plugins, most of a second as a
  * first trailer starts.
  */
+/** Whether Shaka's polyfills are in, which every trailer would otherwise redo. */
+let prepared = false;
+
 function answerForTv(): void {
   const webapis = (
     window as { webapis?: Record<string, Record<string, unknown> | undefined> }
@@ -144,21 +147,25 @@ export function playDash(
     try {
       shaka = (await import('shaka-player')).default;
       if (gone) return;
-      const native = 'requestVideoFrameCallback' in HTMLVideoElement.prototype;
-      answerForTv();
-      shaka.polyfill.installAll();
-      // Shaka's stand-in for it asks the video how many frames it drew on every
-      // frame, which costs a Samsung TV (Chromium 69) most of a second as a
-      // trailer starts; Shaka carries on without it.
-      if (!native) {
-        Reflect.deleteProperty(
-          HTMLVideoElement.prototype,
-          'requestVideoFrameCallback'
-        );
-        Reflect.deleteProperty(
-          HTMLVideoElement.prototype,
-          'cancelVideoFrameCallback'
-        );
+      if (!prepared) {
+        const native =
+          'requestVideoFrameCallback' in HTMLVideoElement.prototype;
+        answerForTv();
+        shaka.polyfill.installAll();
+        // Shaka's stand-in for it asks the video how many frames it drew on every
+        // frame, which costs a Samsung TV (Chromium 69) most of a second as a
+        // trailer starts; Shaka carries on without it.
+        if (!native) {
+          Reflect.deleteProperty(
+            HTMLVideoElement.prototype,
+            'requestVideoFrameCallback'
+          );
+          Reflect.deleteProperty(
+            HTMLVideoElement.prototype,
+            'cancelVideoFrameCallback'
+          );
+        }
+        prepared = true;
       }
       player = new shaka.Player();
       await player.attach(video);

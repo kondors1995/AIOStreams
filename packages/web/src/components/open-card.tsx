@@ -156,13 +156,21 @@ function metaLine(item: BaseItemDto): string {
     .join(' • ');
 }
 
-export function OpenDetails({ item }: { item: BaseItemDto }) {
+export function OpenDetails({
+  item,
+  trailer = true,
+}: {
+  item: BaseItemDto;
+  /** Whether a trailer will play, so its address is worth asking for. */
+  trailer?: boolean;
+}) {
   // The rows leave out the overview and genres.
   const details = useItem(item.Id ?? '');
   const full = details.data ?? item;
   // Also asks for its trailer's address now, so loading it later skips that.
   const prefetch = usePrefetchTrailer();
-  const first = details.data ? trailersOf(details.data)[0]?.url : undefined;
+  const first =
+    trailer && details.data ? trailersOf(details.data)[0]?.url : undefined;
   React.useEffect(() => prefetch(first), [first, prefetch]);
   return (
     <div
@@ -263,9 +271,12 @@ export function OpenTrailer({
     if (!el || !url) return;
     let gone = false;
     let played = false;
+    let failed = false;
     let stop = () => {};
+    // Once: a fault can reach here from both the video and Shaka.
     const fail = () => {
-      if (gone) return;
+      if (gone || failed) return;
+      failed = true;
       setShown(false);
       if (!played) setAt((i) => i + 1);
     };
@@ -348,6 +359,11 @@ export function OpenCard({ href, item }: { href: string; item: BaseItemDto }) {
     timers.current.forEach(clearTimeout);
     timers.current = [];
   };
+  const holding = React.useRef(false);
+  const hold = (el: HTMLElement, on: boolean) => {
+    holding.current = on;
+    layered(el, on);
+  };
   const close = () => {
     stop();
     const el = slide();
@@ -356,7 +372,7 @@ export function OpenCard({ href, item }: { href: string; item: BaseItemDto }) {
     // Held with the other timers, so focus coming back cancels it: it would
     // otherwise drop the frame's layer that a trailer's picture needs.
     if (el)
-      timers.current.push(setTimeout(() => layered(el, false), OPEN_MS + 50));
+      timers.current.push(setTimeout(() => hold(el, false), OPEN_MS + 50));
     setReady(false);
     setLoadTrailer(false);
     setPlayTrailer(false);
@@ -367,22 +383,22 @@ export function OpenCard({ href, item }: { href: string; item: BaseItemDto }) {
     return () => cancelIdleCallback(idle);
   }, []);
   // A slide left open by a card no longer drawn would hold its width.
-  React.useEffect(
-    () => () => {
+  React.useEffect(() => {
+    // Now: the ref is gone by the time this cleans up.
+    const el = slide();
+    return () => {
       stop();
-      const el = slide();
       el?.removeAttribute('data-open');
-      if (el) layered(el, false);
-    },
+      if (el && holding.current) layered(el, false);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
+  }, []);
   const onFocus = () => {
     stop();
     timers.current = [
       setTimeout(() => {
         const el = slide();
-        if (el) layered(el, true);
+        if (el) hold(el, true);
         setReady(true);
       }, READY_MS),
       setTimeout(() => {
